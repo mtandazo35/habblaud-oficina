@@ -118,6 +118,15 @@ describe('PrivacyView', () => {
     expect(visible('pub')).toBe(true);
   });
 
+  it('arquivo dentro da pasta escondida não abre, nem por um caminho com ".." ou pelo caminho do host', () => {
+    const view = hiding('/d/priv');
+    expect(view.hidesPath('/d/priv/projects/a.html')).toBe(true);
+    expect(view.hidesPath('/d/pub/../priv/a.html')).toBe(true);
+    expect(view.hidesPath('/host/priv/a.html')).toBe(true);
+    expect(view.hidesPath('/d/privada/a.html')).toBe(false);
+    expect(view.hidesPath('/d/pub/a.html')).toBe(false);
+  });
+
   it('nome da sala não denuncia outra com o mesmo final de caminho, e o apelido continua valendo', () => {
     const base = snapshot(1, {
       rooms: [room('/a/app', 0, { name: 'a/app' }), room('/b/app', 1, { name: 'b/app' }), room('/c/log', 2, { name: 'apelido' })],
@@ -334,7 +343,7 @@ function openSession(dir: string, pid: number, sessionId: string, cwd: string, m
       withCwd(L.prompt(`pedido ${mark}`, { sessionId, at }), cwd),
       withCwd(L.assistant([L.tool(`tool-${pid}`, 'Bash', { command: `echo ${mark}` })], { sessionId, at: at + 1000 }), cwd),
       withCwd(L.result(`tool-${pid}`, `saida ${mark}`, { sessionId, at: at + 2000 }), cwd),
-      withCwd(L.assistant([L.text(`Pronto: resposta ${mark} em ${dir}/relatorio-${mark}.txt`)], { sessionId, at: at + 3000, stop: 'end_turn' }), cwd),
+      withCwd(L.assistant([L.text(`Pronto: resposta ${mark} em ${dir}/relatorio-${mark}.html`)], { sessionId, at: at + 3000, stop: 'end_turn' }), cwd),
       withCwd(L.prompt(`segundo pedido ${mark}`, { sessionId, at: at + 4000 }), cwd),
     ].join('\n')}\n`,
   );
@@ -374,17 +383,32 @@ function call(port: number, path: string, o: { method?: string; cookie?: string;
   });
 }
 
+/** Como o EventSource: guarda tudo o que chega e reconecta quando a conexão cai (mudar uma conta corta as conexões dela). */
 class Stream {
   data = '';
-  private req: http.ClientRequest;
-  constructor(port: number, cookie?: string) {
-    this.req = http.get({ host: '127.0.0.1', port, path: '/api/stream', headers: cookie ? { Cookie: cookie } : {} }, (res) => {
+  private req?: http.ClientRequest;
+  private closed = false;
+  constructor(
+    private readonly port: number,
+    private readonly cookie?: string,
+  ) {
+    this.connect();
+  }
+  private connect(): void {
+    if (this.closed) return;
+    const again = () => {
+      if (!this.closed) setTimeout(() => this.connect(), 200);
+    };
+    const req = http.get({ host: '127.0.0.1', port: this.port, path: '/api/stream', headers: this.cookie ? { Cookie: this.cookie } : {} }, (res) => {
       res.on('data', (c: Buffer) => (this.data += c.toString('utf8')));
+      res.on('close', again);
     });
-    this.req.on('error', () => {});
+    req.on('error', again);
+    this.req = req;
   }
   close(): void {
-    this.req.destroy();
+    this.closed = true;
+    this.req?.destroy();
   }
   /** O último snapshot recebido. */
   snapshot(): OfficeSnapshot {
@@ -515,8 +539,8 @@ describe('de ponta a ponta: dois usuários reais na mesma instância', () => {
     }
     writeFileSync(join(privDir, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: `${PRIV}@example.org`, organizationName: `${PRIV} Org` } }));
     writeFileSync(join(pubDir, '.claude.json'), JSON.stringify({ oauthAccount: { emailAddress: `${PUB}@example.org` } }));
-    writeFileSync(join(privDir, `relatorio-${PRIV}.txt`), `conteudo ${PRIV}`);
-    writeFileSync(join(pubDir, `relatorio-${PUB}.txt`), `conteudo ${PUB}`);
+    writeFileSync(join(privDir, `relatorio-${PRIV}.html`), `conteudo ${PRIV}`);
+    writeFileSync(join(pubDir, `relatorio-${PUB}.html`), `conteudo ${PUB}`);
     // A sala privada entra primeiro: pegaria o slot 0 do prédio.
     openSession(privDir, 2001, UUIDS.priv, PRIV_ROOM, PRIV);
     openSession(privDir, 2002, UUIDS.privShared, SHARED, PRIV);
@@ -573,13 +597,10 @@ describe('de ponta a ponta: dois usuários reais na mesma instância', () => {
       // Deixa os gravadores de cada visão trabalharem.
       await new Promise((r) => setTimeout(r, 2500));
 
-      // Controle: o dono alcança tudo o que os outros não podem alcançar.
-      const donoDeliveries = await call(srv.remote, '/api/deliveries', { cookie: cookies.oper });
-      expect(donoDeliveries.status).toBe(200);
-      // Só operador tem `terminal`: para o controle de entregas o dono precisa do papel.
+      // Só quem tem `terminal` abre entregas e histórico: para servir de controle ali, o dono precisa do papel.
       expect((await call(srv.remote, '/api/remote/users/dono', { method: 'PATCH', cookie: chefe, body: { role: 'operator' } })).status).toBe(200);
-      cookies.dono = await login(srv.remote, 'dono', USER_PASS);
-      await until('o dono reconectar', () => call(srv.remote, '/api/remote/me', { cookie: cookies.dono }).then((r) => r.status === 200));
+      // Mudar o papel corta as conexões da conta logo depois de responder.
+      await new Promise((r) => setTimeout(r, 400));
       const ownerList = JSON.parse((await call(srv.remote, '/api/deliveries', { cookie: cookies.dono })).body) as { deliveries: Array<{ text: string; attachments: Array<{ id: string; name: string }> }> };
       const ownerFile = ownerList.deliveries.flatMap((d) => d.attachments).find((a) => a.name.includes(PRIV));
       expect(ownerFile, JSON.stringify(ownerList).slice(0, 2000)).toBeDefined();
@@ -623,7 +644,7 @@ describe('de ponta a ponta: dois usuários reais na mesma instância', () => {
           ['/api/messages', 'POST', { agentId: privAgent.id, text: 'oi' }],
           [`/api/agents/${privId}/stop`, 'POST', {}],
           [`/api/agents/${privId}/takeover`, 'POST', {}],
-          [`/api/agents/${privId}/character`, 'DELETE', undefined],
+          [`/api/agents/${privId}/character`, 'DELETE', {}],
           ['/api/rooms/rename', 'POST', { id: PRIV_ROOM, name: 'x' }],
           ['/api/demo', 'POST', { enabled: true }],
         ] as Array<[string, string, unknown]>) {
@@ -658,7 +679,24 @@ describe('de ponta a ponta: dois usuários reais na mesma instância', () => {
         // E o que é público continua chegando: filtrar não virou esconder tudo.
         expect(live[u].data).toContain(`${PUB}-VIVO`);
       }
-      // Público para quem tem o papel: histórico, entregas, Meu dia e timelapse.
+      // "Meu dia" só conta o que a visão vê, inclusive na sala que as duas contas dividem.
+      const counted = (JSON.parse((await call(srv.remote, '/api/stats', { cookie: cookies.oper })).body) as { stats: { totals: { sessions: number }; rooms: unknown[]; accounts: unknown[] } }).stats;
+      expect(counted.totals.sessions).toBe(2);
+      expect(counted.rooms).toHaveLength(2);
+      expect(counted.accounts).toHaveLength(1);
+
+      // Público para quem tem o papel: nada do que é dele ficou preso no filtro.
+      const pubAgent = (JSON.parse((await call(srv.remote, '/api/snapshot', { cookie: cookies.oper })).body) as OfficeSnapshot).agents.find((a) => a.sessionId === UUIDS.pub)!;
+      const pubId = encodeURIComponent(pubAgent.id);
+      expect((await call(srv.remote, `/api/agents/${pubId}`, { cookie: cookies.oper })).body).toContain(PUB);
+      expect((await call(srv.remote, `/api/agents/${pubId}/terminal`, { cookie: cookies.oper })).body).toContain(PUB);
+      expect((await call(srv.remote, `/api/sessions/${encodeURIComponent(pubAgent.account)}/${UUIDS.pub}/terminal`, { cookie: cookies.oper })).body).toContain(PUB);
+      // Sem o plugin ligado a sessão não recebe mensagem: 409, e não o 404 de quem não existe.
+      expect((await call(srv.remote, '/api/messages', { method: 'POST', cookie: cookies.oper, body: { agentId: pubAgent.id, text: 'oi' } })).status).toBe(409);
+      const pubPerm = await call(srv.local, '/api/permissions', { method: 'POST', body: { session_id: UUIDS.pub, tool_name: 'Bash', tool_input: { command: 'ls' } } });
+      const pubPermId = (JSON.parse(pubPerm.body) as { id: string }).id;
+      expect((await call(srv.remote, `/api/permissions/${pubPermId}`, { cookie: cookies.oper })).status).toBe(200);
+      expect((await call(srv.remote, `/api/permissions/${pubPermId}/decision`, { method: 'POST', cookie: cookies.oper, body: { behavior: 'deny' } })).status).toBe(200);
       const operSessions = await call(srv.remote, '/api/sessions/recent', { cookie: cookies.oper });
       expect(operSessions.body).toContain(UUIDS.pub);
       expect((await call(srv.remote, '/api/deliveries', { cookie: cookies.oper })).body).toContain(PUB);
