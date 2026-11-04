@@ -12,6 +12,11 @@ do meio (0.**3**.0).
 
 ### Alterado
 
+- **Contas e papéis no acesso remoto.** Cada pessoa tem o seu usuário e um papel: Ver, Aprovar, Operar ou Administrar. A
+  página `/usuarios` cria, desativa e remove contas, troca senhas e encerra sessões; `npm run remote:users` faz o mesmo
+  pelo servidor. Desativar corta na hora as conexões abertas. A conta do `.env` vira a primeira administradora, com a
+  mesma senha; `HABBLAUD_REMOTE_ALLOW` continua sendo o teto de todos.
+- **O freio do login agora é por endereço:** errar a senha de propósito não trava o login dos outros.
 - **Instalação rápida:** `install.sh` instala ou atualiza com um comando só em Debian e Ubuntu.
 - **Habblaud World e a consulta de versão nova vêm desligados.** `HABBLAUD_WORLD=1` e `HABBLAUD_UPDATE_CHECK=1` ligam.
 

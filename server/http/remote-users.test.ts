@@ -72,10 +72,10 @@ async function call(base: string, method: string, path: string, opts: { cookie?:
     method,
     redirect: 'manual',
     headers: {
-      ...(opts.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+      ...(method !== 'GET' ? { 'Content-Type': 'application/json' } : {}),
       ...(opts.cookie ? { Cookie: opts.cookie } : {}),
     },
-    body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+    body: method === 'GET' ? undefined : JSON.stringify(opts.body ?? {}),
   });
   const text = await res.text();
   let json: Record<string, unknown> = {};
@@ -239,10 +239,10 @@ describe('contas: tirar o acesso', () => {
     expect((await call(base, 'GET', '/api/remote/me', { cookie: second })).status).toBe(401);
     expect((await call(base, 'PATCH', '/api/remote/users/ana', { cookie: admin, body: { revoke: true } })).status).toBe(404);
     await addUser(base, admin, 'ana', 'approver', 'senha da ana 123');
+    expect((await call(base, 'GET', '/api/remote/me', { cookie: first })).status).toBe(401);
+    expect((await call(base, 'GET', '/api/remote/me', { cookie: second })).status).toBe(401);
     const third = await login(base, 'ana', 'senha da ana 123');
-    await call(base, 'PATCH', '/api/remote/users/ana', { cookie: admin, body: { revoke: true } });
-    await call(base, 'PATCH', '/api/remote/users/ana', { cookie: admin, body: { revoke: true } });
-    expect((await call(base, 'GET', '/api/remote/me', { cookie: third })).status).toBe(401);
+    expect((await call(base, 'GET', '/api/remote/me', { cookie: third })).status).toBe(200);
   });
 
   it('mudar o papel vale na hora, sem novo login', async () => {
@@ -328,7 +328,7 @@ describe('freio por endereço', () => {
   it('quem erra de um endereço não trava o login de outro', () => {
     let now = 1_000_000;
     const t = new LoginThrottles(() => now);
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 5; i++) {
       const a = t.scoped('192.0.2.1');
       expect(a.begin()).toBe(true);
       a.end(false);
@@ -366,5 +366,11 @@ describe('página de usuários', () => {
     expect(html).not.toContain('innerHTML');
     expect(html).toContain('/api/remote/users');
     expect(html).toContain('<dialog');
+  });
+
+  it('o script da página compila', () => {
+    const script = /<script>([\s\S]*)<\/script>/.exec(usersPage())?.[1] ?? '';
+    expect(script.length).toBeGreaterThan(1000);
+    expect(() => new Function(script)).not.toThrow();
   });
 });

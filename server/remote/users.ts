@@ -143,7 +143,8 @@ export class UserStore {
     if (!isRole(role)) throw new UserError(tr('papel inválido'));
     if (!parsePasswordHash(hash)) throw new UserError(tr('senha inválida'));
     if (this.users.has(name)) throw new UserError(tr('esse usuário já existe'), 409);
-    const user: RemoteUser = { name, role, hash, disabled: false, gen: 0, createdAt: this.now() };
+    // A geração começa no relógio: recriar uma conta removida não ressuscita os tokens da antiga.
+    const user: RemoteUser = { name, role, hash, disabled: false, gen: this.now(), createdAt: this.now() };
     this.users.set(name, user);
     this.commit(name);
     return { ...user };
@@ -252,7 +253,7 @@ export class UserStore {
       role: 'admin',
       hash: this.seed.hashText,
       disabled: false,
-      gen: current ? current.gen + 1 : 0,
+      gen: current ? current.gen + 1 : this.now(),
       createdAt: current?.createdAt ?? this.now(),
     });
     this.seedHash = this.seed.hashText;

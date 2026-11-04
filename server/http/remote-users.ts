@@ -292,7 +292,7 @@ export function usersPage(): string {
     let r;
     try {
       r = await fetch(path, { method, credentials: 'same-origin', cache: 'no-store',
-        headers: body === undefined ? {} : { 'Content-Type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) });
+        headers: method === 'GET' ? {} : { 'Content-Type': 'application/json' }, body: method === 'GET' ? undefined : JSON.stringify(body || {}) });
     } catch { throw new Error(T.noConnection); }
     if (r.status === 401) { location.assign('/login'); throw new Error(T.failed); }
     const data = await r.json().catch(() => ({}));

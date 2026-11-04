@@ -33,7 +33,9 @@ curl -fsSL https://raw.githubusercontent.com/mtandazo35/habblaud-oficina/main/in
 
 Crea la cuenta `habblaud`, instala Node y Claude Code si faltan, y deja el panel en `https://IP_DEL_SERVIDOR:4748` como servicio. La contraseña es aleatoria y queda en `/root/habblaud-panel.txt`; el panel guarda solo su hash. Repetir el comando actualiza, con respaldo previo y sin cambiar la contraseña. Las opciones están al inicio de [`install.sh`](install.sh). No toca el firewall.
 
-**Copia de [marmottajr/habblaud](https://github.com/marmottajr/habblaud) (MIT).** Se diferencia en esto: oculta más contraseñas en el panel (`sshpass`, `mysql -p`, `chpasswd`), trae este instalador, y la ciudad online y el aviso de versión nueva vienen apagados (`HABBLAUD_WORLD=1` y `HABBLAUD_UPDATE_CHECK=1` los activan). El resto de este documento es el del proyecto original.
+**Usuarios.** Cada persona entra con su cuenta y un rol: **Ver**, **Aprobar**, **Operar** o **Administrar**. Se gestionan en `/usuarios` (Ajustes › Usuarios) o en el servidor con `npm run remote:users -- list`. El rol Operar puede ejecutar comandos en el servidor: dáselo solo a gente de total confianza. Si pierdes el acceso, `npm run remote:users -- passwd <usuario>` genera una contraseña nueva.
+
+**Copia de [marmottajr/habblaud](https://github.com/marmottajr/habblaud) (MIT).** Se diferencia en esto: oculta más contraseñas en el panel (`sshpass`, `mysql -p`, `chpasswd`), tiene cuentas con roles, trae este instalador, y la ciudad online y el aviso de versión nueva vienen apagados (`HABBLAUD_WORLD=1` y `HABBLAUD_UPDATE_CHECK=1` los activan). El resto de este documento es el del proyecto original.
 
 ---
 
