@@ -80,7 +80,7 @@ roomAliases.load();
 
 // Office, contas e fontes de agentes se referenciam (avisos de mudança / fontes): ligação tardia.
 const late: { office?: Office; agents?: SourceSet; permissions?: PermissionRegistry; messages?: MessageRegistry; ptys?: PtyManager; ptyOff?: string } = {};
-// Versão nova: consulta a release mais recente no GitHub a cada 6 h (HABBLAUD_UPDATE_CHECK=0 desliga).
+// Versão nova: consulta a release mais recente no GitHub a cada 6 h (só com HABBLAUD_UPDATE_CHECK=1).
 const updates = new UpdateChecker({
   current: config.version,
   repo: config.repo,
@@ -89,8 +89,8 @@ const updates = new UpdateChecker({
   onChange: () => late.office?.markDirty(),
 });
 updates.load();
-// Habblaud World (server/world/): a conta e o personagem neste computador. Ligado por padrão (server.habblaud.com, ou
-// HABBLAUD_WORLD_URL); nada sai do computador antes de a pessoa criar a conta e entrar. HABBLAUD_WORLD=0 esconde tudo
+// Habblaud World (server/world/): a conta e o personagem neste computador. Desligado por padrão: HABBLAUD_WORLD=1 liga (server.habblaud.com, ou
+// HABBLAUD_WORLD_URL); nada sai do computador antes de a pessoa criar a conta e entrar. Desligado, esconde tudo
 // (rotas 404 e nada na interface); uma HABBLAUD_WORLD_URL recusada deixa o recurso desligado.
 const worldStore = new WorldSettingsStore(join(config.dataDir, 'world.json'));
 if (config.world.enabled && config.world.url) worldStore.load();

@@ -10,6 +10,11 @@ do meio (0.**3**.0).
 
 ## [Não lançado]
 
+### Alterado
+
+- **Instalação rápida:** `install.sh` instala ou atualiza com um comando só em Debian e Ubuntu.
+- **Habblaud World e a consulta de versão nova vêm desligados.** `HABBLAUD_WORLD=1` e `HABBLAUD_UPDATE_CHECK=1` ligam.
+
 ### Corrigido
 
 - **Senhas em comandos de shell não aparecem mais no painel.** `sshpass -p`, `SSHPASS=`, `mysql -pX` e parentes,

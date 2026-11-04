@@ -34,7 +34,7 @@ services:
       HABBLAUD_TERMINAL: ${HABBLAUD_TERMINAL:-}
       # 0 desliga as mensagens pelo escritório (mandar mensagens aos agentes pela página e pelo terminal).
       HABBLAUD_MENSAGENS: ${HABBLAUD_MENSAGENS:-}
-      # 0 desliga a verificação de versão nova (consulta às releases no GitHub a cada 6 h).
+      # 1 liga a verificação de versão nova (consulta às releases no GitHub a cada 6 h).
       HABBLAUD_UPDATE_CHECK: ${HABBLAUD_UPDATE_CHECK:-}
       HABBLAUD_LANG: ${HABBLAUD_LANG:-}
       # 0 desliga as sessões do Codex no escritório.
@@ -47,7 +47,7 @@ services:
       HABBLAUD_REMOTE_PASSWORD_HASH: ${HABBLAUD_REMOTE_PASSWORD_HASH:-}
       HABBLAUD_REMOTE_ALLOW: ${HABBLAUD_REMOTE_ALLOW:-}
       HABBLAUD_REMOTE_INSECURE_HTTP: ${HABBLAUD_REMOTE_INSECURE_HTTP:-}
-      # Habblaud World (ligado por padrão: server.habblaud.com; nada sai antes de criar a conta). HABBLAUD_WORLD=0 desliga tudo.
+      # Habblaud World (desligado por padrão; HABBLAUD_WORLD=1 liga: server.habblaud.com; nada sai antes de criar a conta).
       HABBLAUD_WORLD: ${HABBLAUD_WORLD:-}
       HABBLAUD_WORLD_URL: ${HABBLAUD_WORLD_URL:-}
       HABBLAUD_WORLD_DEV: ${HABBLAUD_WORLD_DEV:-}

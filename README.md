@@ -23,6 +23,18 @@
   <img src="docs/screenshots/office.gif" width="820" alt="Animation of a Habblaud room: characters typing at their desks, subagents with badges and activity bubbles" />
 </p>
 
+## ⚡ Instalación rápida (one-liner)
+
+En Debian o Ubuntu con systemd, como root:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mtandazo35/habblaud-oficina/main/install.sh | sudo bash
+```
+
+Crea la cuenta `habblaud`, instala Node y Claude Code si faltan, y deja el panel en `https://IP_DEL_SERVIDOR:4748` como servicio. La contraseña es aleatoria y queda en `/root/habblaud-panel.txt`; el panel guarda solo su hash. Repetir el comando actualiza, con respaldo previo y sin cambiar la contraseña. Las opciones están al inicio de [`install.sh`](install.sh). No toca el firewall.
+
+**Copia de [marmottajr/habblaud](https://github.com/marmottajr/habblaud) (MIT).** Se diferencia en esto: oculta más contraseñas en el panel (`sshpass`, `mysql -p`, `chpasswd`), trae este instalador, y la ciudad online y el aviso de versión nueva vienen apagados (`HABBLAUD_WORLD=1` y `HABBLAUD_UPDATE_CHECK=1` los activan). El resto de este documento es el del proyecto original.
+
 ---
 
 You open Claude Code in several projects, launch subagents, leave tasks running… and lose track of who's doing
@@ -729,7 +741,7 @@ Everything works without configuring anything. If you need to adjust something, 
 | `HABBLAUD_CODEX` | on | `0` turns off Codex in the office. |
 | `HABBLAUD_CODEX_DIRS` | automatic detection | Codex folders, comma-separated (instead of `~/.codex*` and `CODEX_HOME`). |
 | `HABBLAUD_CODEX_BIN` | `codex` from PATH (on Windows, `codex.exe`) | The Codex binary that delivers the messages (`codex queue`), in Node mode or in `npm run codex:bridge`. |
-| `HABBLAUD_UPDATE_CHECK` | on | `0` turns off the new-version check (a request to the repository's releases on GitHub every 6 h). |
+| `HABBLAUD_UPDATE_CHECK` | off | `1` turns on the new-version check (a request to the repository's releases on GitHub every 6 h). |
 | `HABBLAUD_LANG` | system language (except English), otherwise `pt-BR` | Language of the texts the server builds (activities, notices, logs): `pt-BR`, `en`, `es` or `fr`. The interface follows the browser or the choice in Settings › Language. See [Languages](#languages). |
 | `HABBLAUD_ACCOUNTS` | — | JSON to customize name, letter or color, matched by the account folder name. E.g. `[{"id":".claude-conta2","name":"Trabalho","short":"T","color":"#5cc97b"}]`. |
 

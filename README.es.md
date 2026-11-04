@@ -23,6 +23,18 @@
   <img src="docs/screenshots/office.gif" width="820" alt="Animación de una sala de Habblaud: personajes tecleando en los escritorios, subagentes con gafete y globos de actividad" />
 </p>
 
+## ⚡ Instalación rápida (one-liner)
+
+En Debian o Ubuntu con systemd, como root:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mtandazo35/habblaud-oficina/main/install.sh | sudo bash
+```
+
+Crea la cuenta `habblaud`, instala Node y Claude Code si faltan, y deja el panel en `https://IP_DEL_SERVIDOR:4748` como servicio. La contraseña es aleatoria y queda en `/root/habblaud-panel.txt`; el panel guarda solo su hash. Repetir el comando actualiza, con respaldo previo y sin cambiar la contraseña. Las opciones están al inicio de [`install.sh`](install.sh). No toca el firewall.
+
+**Copia de [marmottajr/habblaud](https://github.com/marmottajr/habblaud) (MIT).** Se diferencia en esto: oculta más contraseñas en el panel (`sshpass`, `mysql -p`, `chpasswd`), trae este instalador, y la ciudad online y el aviso de versión nueva vienen apagados (`HABBLAUD_WORLD=1` y `HABBLAUD_UPDATE_CHECK=1` los activan). El resto de este documento es el del proyecto original.
+
 ---
 
 Abres Claude Code en varios proyectos, lanzas subagentes, dejas tareas en marcha… y pierdes la noción de quién está
@@ -763,7 +775,7 @@ Todo funciona sin configurar nada. Si necesitas ajustar algo, usa variables de e
 | `HABBLAUD_CODEX` | activado | `0` desactiva Codex en la oficina. |
 | `HABBLAUD_CODEX_DIRS` | detección automática | Carpetas de Codex, separadas por comas (en lugar de `~/.codex*` y `CODEX_HOME`). |
 | `HABBLAUD_CODEX_BIN` | `codex` del PATH (en Windows, `codex.exe`) | El binario de Codex que entrega los mensajes (`codex queue`), en modo Node o en `npm run codex:bridge`. |
-| `HABBLAUD_UPDATE_CHECK` | activada | `0` desactiva la comprobación de versión nueva (una consulta a las releases del repositorio en GitHub cada 6 h). |
+| `HABBLAUD_UPDATE_CHECK` | desactivada | `1` activa la comprobación de versión nueva (una consulta a las releases del repositorio en GitHub cada 6 h). |
 | `HABBLAUD_LANG` | idioma del sistema (salvo inglés); si no, `pt-BR` | Idioma de los textos que arma el servidor (actividades, avisos, logs): `pt-BR`, `en`, `es` o `fr`. La interfaz sigue al navegador o la elección en Configuración › Idioma. Consulta [Idiomas](#idiomas). |
 | `HABBLAUD_ACCOUNTS` | — | JSON para personalizar el nombre, la letra o el color, emparejado por el nombre de la carpeta de la cuenta. P. ej.: `[{"id":".claude-conta2","name":"Trabalho","short":"T","color":"#5cc97b"}]`. |
 

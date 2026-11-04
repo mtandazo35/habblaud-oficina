@@ -172,8 +172,8 @@ export function messagesOffReason(env: NodeJS.ProcessEnv, host: string, inDocker
 }
 
 /**
- * O servidor do Habblaud World quando HABBLAUD_WORLD_URL está ausente ou vazia: o World vem ligado por padrão, mas nada
- * sai do computador antes de a pessoa criar a conta e entrar (server/world/service.ts). HABBLAUD_WORLD=0 desliga tudo.
+ * O servidor do Habblaud World quando HABBLAUD_WORLD_URL está ausente ou vazia: o World vem desligado por padrão (HABBLAUD_WORLD=1 liga) e nada
+ * sai do computador antes de a pessoa criar a conta e entrar (server/world/service.ts).
  */
 export const DEFAULT_WORLD_URL = 'https://server.habblaud.com';
 
@@ -189,7 +189,7 @@ const LOCAL_WORLD_HOSTS: readonly string[] = ['127.0.0.1', 'host.docker.internal
  */
 export function parseWorldConfig(env: NodeJS.ProcessEnv, argv: string[]): WorldConfig {
   const flag = env.HABBLAUD_WORLD?.trim();
-  const enabled = !flag || isTruthy(flag);
+  const enabled = isTruthy(flag);
   const dev = argv.includes('--dev') || isTruthy(env.HABBLAUD_WORLD_DEV);
   if (!enabled) return { enabled, dev };
   const raw = env.HABBLAUD_WORLD_URL?.trim();
@@ -247,7 +247,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, argv: string[] 
     rootDir,
     version: pkg.version,
     repo: pkg.repo,
-    updateCheck: !env.HABBLAUD_UPDATE_CHECK?.trim() || isTruthy(env.HABBLAUD_UPDATE_CHECK),
+    updateCheck: isTruthy(env.HABBLAUD_UPDATE_CHECK),
     codex: !env.HABBLAUD_CODEX?.trim() || isTruthy(env.HABBLAUD_CODEX),
     remote: remote.config,
     remoteWarning: remote.warning,
