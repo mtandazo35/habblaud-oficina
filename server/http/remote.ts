@@ -16,6 +16,8 @@
 //   HABBLAUD_REMOTE_PORT / HABBLAUD_REMOTE_HOST  só no Node (padrão 0.0.0.0:4748); no Docker o container escuta sempre
 //                           em 0.0.0.0:4748 e quem decide a exposição é a porta publicada (HABBLAUD_REMOTE_BIND).
 //
+// Contas e papéis: remote/users.ts e http/remote-users.ts. HABBLAUD_REMOTE_ALLOW continua sendo o teto de todos.
+//
 // Sessão: cookie HttpOnly + SameSite=Strict (+ Secure com HTTPS) assinado com HMAC; chave = segredo aleatório em
 // <dataDir>/remote-secret misturado com usuário e hash da senha: trocar a senha derruba todas as sessões.
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
@@ -26,6 +28,7 @@ import net from 'node:net';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { parsePasswordHash, verifyPassword, type PasswordHash } from '../remote/password';
+import { normalizeName, type ConnectionTracker, type RemoteUser, type UserStore } from '../remote/users';
 import { hostAllowed } from './guard';
 import { getLocale, tr } from '../../shared/i18n';
 
@@ -158,9 +161,33 @@ export class RemoteSessions {
     return !!parsed && !this.revoked.has(parsed.sig);
   }
 
+  /** Sessão de uma conta: a geração no token deixa derrubar todas as sessões dela de uma vez (remote/users.ts). */
+  issueFor(user: string, gen: number): { token: string; maxAgeS: number } {
+    const payload = `v2.${user}.${gen}.${this.now() + SESSION_MS}`;
+    return { token: `${payload}.${this.sign(payload)}`, maxAgeS: Math.floor(SESSION_MS / 1000) };
+  }
+
+  /** De quem é este token; undefined se for inválido, vencido ou encerrado por "Sair". */
+  identify(token: string | undefined): { user: string; gen: number } | undefined {
+    const parsed = this.parseAccount(token);
+    return parsed && !this.revoked.has(parsed.sig) ? { user: parsed.user, gen: parsed.gen } : undefined;
+  }
+
+  private parseAccount(token: string | undefined): { user: string; gen: number; exp: number; sig: string } | undefined {
+    if (!token) return undefined;
+    const m = /^(v2\.([a-z0-9._-]{1,32})\.(\d{1,15})\.(\d{10,16}))\.([A-Za-z0-9_-]{43})$/.exec(token);
+    if (!m) return undefined;
+    const exp = Number(m[4]);
+    if (exp <= this.now()) return undefined;
+    const expected = Buffer.from(this.sign(m[1]));
+    const got = Buffer.from(m[5]);
+    if (expected.length !== got.length || !timingSafeEqual(expected, got)) return undefined;
+    return { user: m[2], gen: Number(m[3]), exp, sig: m[5] };
+  }
+
   /** Encerra este token (botão "Sair"); token inválido ou vencido não muda nada. */
   revoke(token: string | undefined): void {
-    const parsed = this.parse(token);
+    const parsed = this.parse(token) ?? this.parseAccount(token);
     if (!parsed) return;
     const now = this.now();
     for (const [sig, exp] of this.revoked) if (exp <= now) this.revoked.delete(sig);
@@ -257,8 +284,65 @@ export class LoginThrottle {
   }
 }
 
+/** O que o filtro precisa de um freio: o global acima ou o de um endereço (LoginThrottles.scoped). */
+export interface LoginLimit {
+  retryAfter(): number;
+  begin(): boolean;
+  end(ok: boolean): void;
+}
+
+/**
+ * Um freio por endereço: quem erra a senha de propósito não trava o login dos outros. O limite de conferências ao mesmo
+ * tempo continua global, porque cada scrypt custa ~32 MB. Com Docker todo mundo chega pelo gateway e vale como um só.
+ */
+export class LoginThrottles {
+  private readonly byIp = new Map<string, LoginThrottle>();
+  private running = 0;
+
+  constructor(
+    private readonly now: () => number = Date.now,
+    private readonly maxIps = 1000,
+    private readonly maxRunning = 4,
+  ) {}
+
+  private of(ip: string): LoginThrottle {
+    let t = this.byIp.get(ip);
+    if (t) this.byIp.delete(ip);
+    else t = new LoginThrottle(this.now);
+    this.byIp.set(ip, t);
+    if (this.byIp.size > this.maxIps) {
+      for (const [key, other] of this.byIp) {
+        if (other.retryAfter() === 0) {
+          this.byIp.delete(key);
+          break;
+        }
+      }
+      if (this.byIp.size > this.maxIps) this.byIp.delete(this.byIp.keys().next().value as string);
+    }
+    return t;
+  }
+
+  scoped(ip: string): LoginLimit {
+    const t = this.of(ip);
+    return {
+      retryAfter: () => Math.max(t.retryAfter(), this.running >= this.maxRunning ? 1 : 0),
+      begin: () => {
+        if (this.running >= this.maxRunning || !t.begin()) return false;
+        this.running++;
+        return true;
+      },
+      end: (ok) => {
+        this.running--;
+        t.end(ok);
+      },
+    };
+  }
+}
+
 /** Requisições que chegaram pela porta remota e passaram pelo login. */
 const remoteRequests = new WeakSet<IncomingMessage>();
+/** A conta de cada requisição autenticada. */
+const requestUsers = new WeakMap<IncomingMessage, string>();
 /** Arquivos que a porta remota serve sem login: manifesto e ícones (o celular os busca antes do login, sem o
  *  cookie). Nada da API nem do escritório. */
 const PUBLIC_STATIC = /^\/(manifest\.webmanifest|assets\/brand\/[\w.@-]+\.png)$/;
@@ -267,7 +351,11 @@ export function isRemoteRequest(req: IncomingMessage): boolean {
   return remoteRequests.has(req);
 }
 
-function sendJson(res: ServerResponse, status: number, body: unknown, headers: Record<string, string | string[]> = {}): void {
+export function remoteRequestUser(req: IncomingMessage): string | undefined {
+  return requestUsers.get(req);
+}
+
+export function sendJson(res: ServerResponse, status: number, body: unknown, headers: Record<string, string | string[]> = {}): void {
   const data = JSON.stringify(body);
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
@@ -279,7 +367,7 @@ function sendJson(res: ServerResponse, status: number, body: unknown, headers: R
   res.end(data);
 }
 
-function readBody(req: IncomingMessage, max = 8 * 1024): Promise<string> {
+export function readBody(req: IncomingMessage, max = 8 * 1024): Promise<string> {
   return new Promise((ok, fail) => {
     const chunks: Buffer[] = [];
     let size = 0;
@@ -341,7 +429,7 @@ export function loginPage(opts: { caDownload: boolean }): string {
 <body>
 <form id="f" autocomplete="on">
   <h1>Habblaud</h1>
-  <p>${esc(tr('Acesso pelo celular. Entre com o usuário e a senha que você escolheu no npm run remote:setup.'))}</p>
+  <p>${esc(tr('Entre com o seu usuário e a sua senha.'))}</p>
   <label for="u">${esc(tr('Usuário'))}</label>
   <input id="u" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
   <label for="p">${esc(tr('Senha'))}</label>
@@ -370,7 +458,7 @@ export function loginPage(opts: { caDownload: boolean }): string {
 `;
 }
 
-function sendHtml(res: ServerResponse, html: string): void {
+export function sendHtml(res: ServerResponse, html: string): void {
   res.writeHead(200, {
     'Content-Type': 'text/html; charset=utf-8',
     'Content-Length': Buffer.byteLength(html),
@@ -396,6 +484,12 @@ export interface RemoteGateDeps {
   throttle?: LoginThrottle;
   /** Conferência da senha (injetável nos testes; padrão: scrypt). */
   verify?: (password: string, hash: PasswordHash) => Promise<boolean>;
+  /** Contas com papéis (remote/users.ts). Ausente = o usuário único do .env. */
+  users?: UserStore;
+  throttles?: LoginThrottles;
+  connections?: ConnectionTracker;
+  /** Rotas das contas, já com a requisição autenticada (http/remote-users.ts). */
+  routes?: (req: IncomingMessage, res: ServerResponse, url: URL, who: RemoteUser) => boolean;
 }
 
 /**
@@ -404,23 +498,33 @@ export interface RemoteGateDeps {
  */
 export function createRemoteGate(deps: RemoteGateDeps): (req: IncomingMessage, res: ServerResponse, url: URL) => boolean {
   const throttle = deps.throttle ?? new LoginThrottle();
+  const throttles = deps.throttles ?? new LoginThrottles();
   const verify = deps.verify ?? verifyPassword;
+  const users = deps.users;
+  const identify = (token: string | undefined): RemoteUser | undefined => {
+    const id = deps.sessions.identify(token);
+    const user = id && users?.get(id.user);
+    return user && !user.disabled && user.gen === id.gen ? user : undefined;
+  };
   const caAvailable = () => !!deps.caFile && existsSync(deps.caFile);
   return (req, res, url) => {
     const path = url.pathname;
     const method = req.method ?? 'GET';
-    const authed = deps.sessions.verify(readCookie(req.headers.cookie, COOKIE));
+    const cookie = readCookie(req.headers.cookie, COOKIE);
+    const who = users ? identify(cookie) : undefined;
+    const authed = users ? !!who : deps.sessions.verify(cookie);
 
     if (path === '/api/remote/login') {
       if (method !== 'POST') {
         sendJson(res, 405, { error: tr('método não permitido') }, { Allow: 'POST' });
         return true;
       }
+      const limit: LoginLimit = users ? throttles.scoped(req.socket.remoteAddress ?? '') : throttle;
       const tooMany = () => {
-        const wait = Math.max(1, throttle.retryAfter());
+        const wait = Math.max(1, limit.retryAfter());
         sendJson(res, 429, { error: tr('Muitas tentativas. Tente de novo em {0} s.', [wait]) }, { 'Retry-After': String(wait) });
       };
-      if (throttle.retryAfter() > 0) {
+      if (limit.retryAfter() > 0) {
         req.resume();
         tooMany();
         return true;
@@ -431,7 +535,7 @@ export function createRemoteGate(deps: RemoteGateDeps): (req: IncomingMessage, r
       let ok = false;
       readBody(req)
         .then(async (raw) => {
-          if (!throttle.begin()) return tooMany();
+          if (!limit.begin()) return tooMany();
           begun = true;
           let body: { user?: unknown; password?: unknown } = {};
           try {
@@ -441,6 +545,16 @@ export function createRemoteGate(deps: RemoteGateDeps): (req: IncomingMessage, r
           }
           const user = typeof body.user === 'string' ? body.user : '';
           const password = typeof body.password === 'string' ? body.password : '';
+          if (users) {
+            const account = users.get(normalizeName(user));
+            const stored = account && !account.disabled ? parsePasswordHash(account.hash) : undefined;
+            // O scrypt roda sempre, até para conta que não existe ou está desativada.
+            const matches = await verify(password, stored ?? deps.config.passwordHash);
+            if (!account || !stored || !matches) return sendJson(res, 401, { error: tr('Usuário ou senha incorretos.') });
+            ok = true;
+            const session = deps.sessions.issueFor(account.name, account.gen);
+            return sendJson(res, 200, { ok: true }, { 'Set-Cookie': cookieHeader(session.token, session.maxAgeS, deps.secure) });
+          }
           // O scrypt roda sempre (sem atalho que denuncie se foi o usuário ou a senha que errou).
           const okPassword = await verify(password, deps.config.passwordHash);
           const okUser = safeEqual(user.trim(), deps.config.user);
@@ -453,7 +567,7 @@ export function createRemoteGate(deps: RemoteGateDeps): (req: IncomingMessage, r
           if (!res.headersSent) sendJson(res, 400, { error: tr('requisição inválida') });
         })
         .finally(() => {
-          if (begun) throttle.end(ok);
+          if (begun) limit.end(ok);
         });
       return true;
     }
@@ -497,6 +611,11 @@ export function createRemoteGate(deps: RemoteGateDeps): (req: IncomingMessage, r
 
     if (authed) {
       remoteRequests.add(req);
+      if (who) {
+        requestUsers.set(req, who.name);
+        deps.connections?.add(who.name, req.socket);
+        if (deps.routes?.(req, res, url, who)) return true;
+      }
       return false;
     }
     // Ícone e manifesto do app (Tela de Início): públicos, o celular os busca antes do login (e sem o cookie).

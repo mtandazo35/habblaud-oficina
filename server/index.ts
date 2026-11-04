@@ -9,7 +9,10 @@ import { AccountsService } from './accounts/service';
 import { isTruthy, loadConfig, messagesOffReason, terminalOffReason, worldSocketUrl } from './config';
 import { createApiHandler, sendJson } from './http/app';
 import { createRequestGuard, isLoopbackHost } from './http/guard';
-import { createRemoteGate, isRemoteRequest, loadSecret, RemoteSessions, startRemoteListener, type RemoteListener } from './http/remote';
+import { createRemoteGate, isRemoteRequest, loadSecret, LoginThrottles, RemoteSessions, remoteRequestUser, startRemoteListener, type RemoteFeature, type RemoteListener } from './http/remote';
+import type { IncomingMessage } from 'node:http';
+import { createUserRoutes } from './http/remote-users';
+import { ConnectionTracker, UserStore } from './remote/users';
 import { Hub } from './http/sse';
 import { createStaticHandler } from './http/static';
 import { TerminalStreams } from './http/terminal';
@@ -143,9 +146,15 @@ if (codex) agents.add(codex);
 const codexLive: CodexLive | undefined = codex;
 late.office = office;
 late.agents = agents;
+// Contas da porta remota: o que cada uma pode é o papel dela, dentro do teto de HABBLAUD_REMOTE_ALLOW.
+const remoteUsers = config.remote
+  ? new UserStore(join(config.dataDir, 'remote-users.json'), { user: config.remote.user, hashText: config.remote.passwordHashText })
+  : undefined;
+const remoteCan = (feature: RemoteFeature, req: IncomingMessage): boolean =>
+  !!config.remote?.allow.has(feature) && !!remoteUsers?.can(remoteRequestUser(req), feature);
 // Página que pode responder pelo escritório: Host local na porta local; na remota, só com permissions liberado.
 const hub = new Hub(office, {
-  canAnswer: (req) => (isRemoteRequest(req) ? !!config.remote?.allow.has('permissions') : isLoopbackHost(req.headers.host)),
+  canAnswer: (req) => (isRemoteRequest(req) ? remoteCan('permissions', req) : isLoopbackHost(req.headers.host)),
 });
 // "Meu dia": amostra o escritório a cada segundo e persiste em <dataDir>/stats/ (ver history/daystats.ts).
 const stats = new DayStatsService({ dir: join(config.dataDir, 'stats'), snapshot: () => hub.current() });
@@ -374,7 +383,7 @@ const api = createApiHandler({
   codexLive,
   stats,
   updates,
-  remote: config.remote ? { is: isRemoteRequest, allows: (f) => config.remote!.allow.has(f) } : undefined,
+  remote: config.remote ? { is: isRemoteRequest, allows: remoteCan } : undefined,
   world: world ? createWorldRoutes(world, worldViewer, worldSocial) : undefined,
 });
 
@@ -434,8 +443,18 @@ server.on('error', (err: NodeJS.ErrnoException) => {
 let remoteListener: RemoteListener | undefined;
 if (config.remote) {
   const remote = config.remote;
+  const connections = new ConnectionTracker();
+  const throttles = new LoginThrottles();
+  const users = remoteUsers!;
+  users.onChange((name) => connections.kick(name));
+  users.watch();
+  if (users.problem) log.warn(`   ${users.problem}.`);
   const gate = createRemoteGate({
     config: remote,
+    users,
+    throttles,
+    connections,
+    routes: createUserRoutes({ users, throttles, allow: remote.allow }),
     sessions: new RemoteSessions(loadSecret(join(config.dataDir, 'remote-secret')), remote, Date.now, join(config.dataDir, 'remote-revoked.json')),
     secure: !!remote.tls,
     caFile: remote.tls?.caFile,

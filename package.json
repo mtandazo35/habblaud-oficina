@@ -43,6 +43,7 @@
     "codex:status": "tsx scripts/codex-install.ts status",
     "codex:bridge": "tsx scripts/codex-bridge.ts",
     "remote:setup": "tsx scripts/remote-setup.ts",
+    "remote:users": "tsx scripts/remote-users.ts",
     "remote:mdns": "tsx scripts/remote-mdns.ts",
     "release": "tsx scripts/release.ts"
   },
