@@ -39,8 +39,7 @@ describe('docker-up', () => {
     expect(worldLine({ HABBLAUD_WORLD: '1' })).toBe('Habblaud World: ligado: https://server.habblaud.com (padrão)');
     expect(worldLine({ HABBLAUD_WORLD: '1', HABBLAUD_WORLD_URL: 'wss://server.habblaud.com/' })).toBe('Habblaud World: ligado: https://server.habblaud.com');
     // Do .env (o Compose lê sozinho), com aspas.
-    const file = 'HABBLAUD_WORLD=1
-HABBLAUD_WORLD_URL="http://host.docker.internal:4848"\nHABBLAUD_WORLD_DEV=1\n';
+    const file = 'HABBLAUD_WORLD=1\nHABBLAUD_WORLD_URL="http://host.docker.internal:4848"\nHABBLAUD_WORLD_DEV=1\n';
     expect(worldLine({}, file)).toBe('Habblaud World: ligado: http://host.docker.internal:4848');
     // Sem o modo de desenvolvimento, http:// é recusado (e o motivo aparece); no container não há --dev.
     expect(worldLine({ HABBLAUD_WORLD: '1', HABBLAUD_WORLD_URL: 'http://host.docker.internal:4848' })).toMatch(/^Habblaud World: desligado \(HABBLAUD_WORLD_URL com http:\/\/.*desenvolvimento/);
