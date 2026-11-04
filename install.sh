@@ -183,6 +183,7 @@ configurar_acceso() {
     )
   fi
   touch "$DIR/.env"
+  poner_env HABBLAUD_IN_DOCKER 0
   poner_env HABBLAUD_PTY 1
   poner_env HABBLAUD_LANG "$HB_IDIOMA"
   chown "$HB_USUARIO:" "$DIR/.env"
