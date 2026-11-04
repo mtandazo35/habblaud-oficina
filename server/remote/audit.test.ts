@@ -39,15 +39,16 @@ describe('registro de acessos', () => {
 
   it('um usuário digitado não forja linhas nem leva controle ao terminal', () => {
     const { file, audit } = setup();
-    const evil = 'ana\n{"t":"x","ev":"login.ok","user":"chefe"}\r \u001b[31mfim';
+    const lineSep = String.fromCharCode(0x2028);
+    const evil = `ana\n{"t":"x","ev":"login.ok","user":"chefe"}\r${lineSep}${String.fromCharCode(0x1b)}[31mfim`;
     audit.write('login.fail', { user: evil, ip: '192.0.2.1', reason: 'credentials' });
     const lines = readFileSync(file, 'utf8').trim().split('\n');
     expect(lines).toHaveLength(1);
     const entry = JSON.parse(lines[0]) as { user: string; ev: string };
     expect(entry.ev).toBe('login.fail');
-    // eslint-disable-next-line no-control-regex
-    expect(entry.user).not.toMatch(/[\u0000-\u001f  \u007f]/);
-    expect(readFileSync(file, 'utf8')).not.toMatch(/ |\u001b/);
+    const hasControl = (text: string) => [...text].some((c) => c.charCodeAt(0) < 0x20 || c.charCodeAt(0) === 0x7f || c === lineSep);
+    expect(hasControl(entry.user)).toBe(false);
+    expect(hasControl(lines[0])).toBe(false);
   });
 
   it('corta campos compridos e ignora o que não é campo conhecido', () => {
