@@ -83,6 +83,12 @@ const IMAGE_EXT = /\.(png|jpe?g|gif|webp|svg|bmp|ico|heic)$/i;
 const SHELL_VALUE = String.raw`(?:'[^']*'|"(?:[^"\\]|\\.)*"|\\.|[^\s'"\\;|&])+`;
 
 /**
+ * Começo de um comando. Num script citado dentro de outro texto, a quebra de linha é o texto "\n": sem isto, "\necho" seria
+ * a palavra "necho" e passaria sem máscara.
+ */
+const COMMAND_START = String.raw`(?:\b|(?<=\\[nrt]))`;
+
+/**
  * Padrões de segredos mascarados em textos e detalhes (comandos, prompts, respostas, erros).
  * Os detalhes vão para o navegador e para o feed: um token colado num `curl` não pode aparecer lá.
  */
@@ -100,27 +106,29 @@ const SECRET_PATTERNS: Array<[RegExp, string]> = [
   [/(\bhttps?:\/\/(?:discordapp|discord)\.com\/api\/webhooks\/)\d+\/[A-Za-z0-9_-]+/gi, '$1***'],
   [/(\bhttps?:\/\/api\.telegram\.org\/bot)\d+:[A-Za-z0-9_-]+/gi, '$1***'],
   // sshpass -p X / -pX / -p 'X Y' (o -p de um ssh depois de `sshpass -f arquivo` é a porta e fica).
-  [new RegExp(String.raw`(\bsshpass(?:\s+-(?:[ve]+|[fdP]\s*\S+))*\s+-[ve]*p\s*)${SHELL_VALUE}`, 'g'), '$1***'],
+  [new RegExp(String.raw`(${COMMAND_START}sshpass(?:\s+-(?:[ve]+|[fdP]\s*\S+))*\s+-[ve]*p\s*)${SHELL_VALUE}`, 'g'), '$1***'],
   // SSHPASS=X, DB_PASS=X, PASS=X.
-  [new RegExp(String.raw`\b([A-Z0-9_]*PASS=)${SHELL_VALUE}`, 'g'), '$1***'],
+  [new RegExp(String.raw`${COMMAND_START}([A-Z0-9_]*PASS=)${SHELL_VALUE}`, 'g'), '$1***'],
   // mysql -pX, mysqldump -p'X', mariadb-dump -pX (`-p` sozinho só pede a senha e fica).
   [
     new RegExp(
-      String.raw`(\b(?:mysql(?:dump|admin|import|show|check|binlog|slap)?|mariadb(?:-dump|-admin|-import|-show|-check|-binlog|-slap)?)\b(?:\\.|'[^']*'|"(?:[^"\\]|\\.)*"|[^\n|;&'"]){0,400}?\s-p)${SHELL_VALUE}`,
+      String.raw`(${COMMAND_START}(?:mysql(?:dump|admin|import|show|check|binlog|slap)?|mariadb(?:-dump|-admin|-import|-show|-check|-binlog|-slap)?)\b(?:\\.|'[^']*'|"(?:[^"\\]|\\.)*"|[^\n|;&'"]){0,400}?\s-p)${SHELL_VALUE}`,
       'g',
     ),
     '$1***',
   ],
   // echo usuario:senha | chpasswd, printf ... | sudo passwd.
   [
-    /\b(echo|printf)\s(?:\\.|'[^']*'|"(?:[^"\\]|\\.)*"|[^|\n'"]){0,400}?\|\s*((?:sudo\b[^|\n;&]*?\s)?(?:[\w./-]*\/)?(?:chpasswd|passwd)\b)/g,
+    /(?:\b|(?<=\\[nrt]))(echo|printf)\s(?:\\.|'[^']*'|"(?:[^"\\]|\\.)*"|[^|\n'"]){0,400}?\|\s*((?:sudo\b[^|\n;&]*?\s)?(?:[\w./-]*\/)?(?:chpasswd|passwd)\b)/g,
     '$1 *** | $2',
   ],
   // chpasswd <<< "usuario:senha".
-  [new RegExp(String.raw`(\bchpasswd\b[^\n|;&]*?<<<\s*)${SHELL_VALUE}`, 'g'), '$1***'],
+  [new RegExp(String.raw`(${COMMAND_START}chpasswd\b[^\n|;&]*?<<<\s*)${SHELL_VALUE}`, 'g'), '$1***'],
   // chpasswd <<EOF ... EOF / cat <<EOF | chpasswd ... EOF.
   [/(\bchpasswd\b[^\n]*(?<!<)<<-?\s*['"]?(\w+)['"]?[^\n]*\n)[\s\S]*?(\n[ \t]*\2\b|$)/g, '$1***$3'],
   [/((?<!<)<<-?\s*['"]?(\w+)['"]?[^\n]*\bchpasswd\b[^\n]*\n)[\s\S]*?(\n[ \t]*\2\b|$)/g, '$1***$3'],
+  // O mesmo heredoc citado dentro de outro texto, com "\n" no lugar das quebras de linha.
+  [/((?:\b|(?<=\\[nrt]))chpasswd\b[^\n]*?(?<!<)<<-?\s*\\?['"]?(\w+)\\?['"]?\\n)[^\n]*?(\\n[ \t]*\2\b|$)/g, '$1***$3'],
   // curl -u usuario:senha / --user usuario:senha.
   [/((?:^|\s)(?:-u|--user)\s+['"]?[^\s:'"]+:)[^\s'"]+/g, '$1***'],
   // --token X, --password=X, --api-key X...

@@ -159,6 +159,14 @@ describe('segredos mascarados', () => {
     expect(maskSecrets("printf 'root:clave\\n' | /usr/sbin/chpasswd")).toBe('printf *** | /usr/sbin/chpasswd');
     expect(maskSecrets('echo clave | sudo -S passwd root')).toBe('echo *** | sudo -S passwd root');
     expect(maskSecrets('chpasswd <<< "root:clave"')).toBe('chpasswd <<< ***');
+    // Script citado dentro de outro texto: "\n" literal antes do comando (visto de verdade num transcript).
+    expect(maskSecrets('a\\necho \\"root:clave\\" | chpasswd\\ncurl x')).toBe('a\\necho *** | chpasswd\\ncurl x');
+    expect(maskSecrets('a\\nsshpass -p clave ssh h')).toBe('a\\nsshpass -p *** ssh h');
+    expect(maskSecrets('a\\nmysql -uroot -pclave db')).toBe('a\\nmysql -uroot -p*** db');
+    expect(maskSecrets('a\\nSSHPASS=clave b')).toBe('a\\nSSHPASS=*** b');
+    expect(maskSecrets('a\\nchpasswd <<< \\"root:clave\\"')).toBe('a\\nchpasswd <<< ***');
+    expect(maskSecrets('chpasswd <<EOF\\nroot:clave\\nEOF\\nls')).toBe('chpasswd <<EOF\\n***\\nEOF\\nls');
+    expect(maskSecrets('necho hola | chpasswd')).toBe('necho hola | chpasswd');
     // Comando citado dentro de outro texto: as aspas chegam escapadas (visto de verdade num transcript).
     expect(maskSecrets('{"cmd":"echo \\"root:clave\\" | chpasswd"}')).toBe('{"cmd":"echo *** | chpasswd"}');
     expect(maskSecrets('echo \\"root:clave\\" | sudo chpasswd')).toBe('echo *** | sudo chpasswd');
