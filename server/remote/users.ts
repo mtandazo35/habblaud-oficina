@@ -6,11 +6,14 @@
 //
 // O arquivo também pode mudar por fora (npm run remote:users): a loja percebe pela data do arquivo. Um arquivo ilegível
 // não é sobrescrito: ninguém entra até consertar, porque recomeçar do zero devolveria acesso a quem foi retirado.
+//
+// O 2FA de cada conta (segredo TOTP e hashes dos códigos de recuperação) mora no mesmo arquivo; ver remote/totp.ts.
 import { chmodSync, existsSync, mkdirSync, readFileSync, renameSync, statSync, unwatchFile, watchFile, writeFileSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { tr } from '../../shared/i18n';
 import type { RemoteFeature } from '../http/remote';
 import { parsePasswordHash } from './password';
+import { findRecovery, generateRecoveryCodes, generateSecret, isRecoveryHash, isTotpSecret, matchStep, normalizeCode, otpauthUri, stepAt } from './totp';
 
 export const ROLES = ['viewer', 'approver', 'operator', 'admin'] as const;
 export type RemoteRole = (typeof ROLES)[number];
@@ -24,6 +27,18 @@ const ROLE_FEATURES: Record<RemoteRole, readonly RemoteFeature[]> = {
 
 export const MIN_PASSWORD = 10;
 const NAME_RE = /^[a-z0-9][a-z0-9._-]{0,31}$/;
+/** Quanto tempo o segredo mostrado na ativação espera pelo primeiro código. */
+const TOTP_PENDING_MS = 15 * 60 * 1000;
+
+/** 2FA ativo. O segredo só existe neste arquivo: não vai para log nem para resposta depois de ativar. */
+export interface RemoteTotp {
+  secret: string;
+  /** Último passo de 30 s aceito: nenhum código daí para trás vale de novo. */
+  lastStep: number;
+  enabledAt: number;
+  /** SHA-256 dos códigos de recuperação que ainda não foram usados. */
+  recovery: string[];
+}
 
 export interface RemoteUser {
   name: string;
@@ -33,6 +48,9 @@ export interface RemoteUser {
   /** Geração das sessões: subir este número derruba todas as sessões da conta. */
   gen: number;
   createdAt: number;
+  totp?: RemoteTotp;
+  /** Ativação começada e ainda sem o primeiro código. */
+  totpPending?: { secret: string; at: number };
 }
 
 export interface UserPatch {
@@ -41,6 +59,13 @@ export interface UserPatch {
   hash?: string;
   /** Encerra as sessões abertas sem mudar mais nada. */
   revoke?: boolean;
+  /** Desliga o 2FA da conta (e derruba as sessões dela). */
+  totpOff?: boolean;
+}
+
+/** Papéis que mexem no servidor: é neles que o 2FA é insistido e, com HABBLAUD_REMOTE_TOTP_REQUIRED, exigido. */
+export function roleNeedsTotp(role: RemoteRole): boolean {
+  return role === 'operator' || role === 'admin';
 }
 
 /** Erro que pode ir para quem pediu: a mensagem é nossa e não revela nada interno. */
@@ -82,7 +107,19 @@ function validUser(u: unknown): u is RemoteUser {
     typeof r.disabled === 'boolean' &&
     Number.isSafeInteger(r.gen) &&
     (r.gen as number) >= 0 &&
-    typeof r.createdAt === 'number'
+    typeof r.createdAt === 'number' &&
+    (r.totp === undefined || validTotp(r.totp)) &&
+    (r.totpPending === undefined || (isTotpSecret(r.totpPending?.secret) && typeof r.totpPending?.at === 'number'))
+  );
+}
+
+function validTotp(t: RemoteTotp): boolean {
+  return (
+    isTotpSecret(t?.secret) &&
+    Number.isSafeInteger(t.lastStep) &&
+    typeof t.enabledAt === 'number' &&
+    Array.isArray(t.recovery) &&
+    t.recovery.every(isRecoveryHash)
   );
 }
 
@@ -91,6 +128,8 @@ export class UserStore {
   private seedHash = '';
   private stamp = '';
   private readonly listeners = new Set<(name: string) => void>();
+  /** A conta do .env foi (re)colocada como administradora ao abrir: quem registra os acessos anota. */
+  seedApplied?: string;
   /** Preenchido quando o arquivo existe e não dá para ler: ninguém entra e nada é gravado por cima. */
   problem?: string;
 
@@ -157,11 +196,16 @@ export class UserStore {
     if (!current) throw new UserError(tr('usuário não encontrado'), 404);
     if (patch.role !== undefined && !isRole(patch.role)) throw new UserError(tr('papel inválido'));
     if (patch.hash !== undefined && !parsePasswordHash(patch.hash)) throw new UserError(tr('senha inválida'));
+    if (patch.totpOff && !current.totp && !current.totpPending) throw new UserError(tr('essa conta não tem 2FA ativo'), 409);
     const next: RemoteUser = { ...current };
+    if (patch.totpOff) {
+      delete next.totp;
+      delete next.totpPending;
+    }
     if (patch.role !== undefined) next.role = patch.role;
     if (patch.disabled !== undefined) next.disabled = patch.disabled;
     if (patch.hash !== undefined) next.hash = patch.hash;
-    if (patch.hash !== undefined || patch.revoke || (patch.disabled && !current.disabled)) next.gen = current.gen + 1;
+    if (patch.hash !== undefined || patch.revoke || patch.totpOff || (patch.disabled && !current.disabled)) next.gen = current.gen + 1;
     const wasAdmin = current.role === 'admin' && !current.disabled;
     const isAdmin = next.role === 'admin' && !next.disabled;
     if (wasAdmin && !isAdmin) this.assertAnotherAdmin(name);
@@ -178,6 +222,66 @@ export class UserStore {
     if (current.role === 'admin' && !current.disabled) this.assertAnotherAdmin(name);
     this.users.delete(name);
     this.commit(name);
+  }
+
+  /**
+   * Começa a ativar o 2FA: o segredo fica pendente até o primeiro código e, enquanto isso, o login não muda. Começar de
+   * novo troca o segredo. Não derruba conexões: nada mudou para a conta ainda.
+   */
+  startTotp(rawName: string): { secret: string; uri: string } {
+    this.refresh();
+    const name = normalizeName(rawName);
+    const current = this.users.get(name);
+    if (!current) throw new UserError(tr('usuário não encontrado'), 404);
+    if (current.totp) throw new UserError(tr('o 2FA já está ativo nesta conta'), 409);
+    const secret = generateSecret();
+    this.users.set(name, { ...current, totpPending: { secret, at: this.now() } });
+    this.save();
+    return { secret, uri: otpauthUri(secret, name) };
+  }
+
+  /** Termina a ativação com o primeiro código certo: devolve os códigos de recuperação (uma vez só) e derruba as sessões. */
+  confirmTotp(rawName: string, code: string): string[] {
+    this.refresh();
+    const name = normalizeName(rawName);
+    const current = this.users.get(name);
+    if (!current) throw new UserError(tr('usuário não encontrado'), 404);
+    if (current.totp) throw new UserError(tr('o 2FA já está ativo nesta conta'), 409);
+    const pending = current.totpPending;
+    if (!pending || this.now() - pending.at > TOTP_PENDING_MS) throw new UserError(tr('A ativação expirou: comece de novo.'), 409);
+    const now = this.now();
+    // O próprio código da ativação já fica gasto: ele não serve para o login logo em seguida.
+    const step = matchStep(pending.secret, normalizeCode(code), now, stepAt(now) - 2);
+    if (step === undefined) throw new UserError(tr('Código incorreto. Confira a hora do celular e tente de novo.'), 403);
+    const { codes, hashes } = generateRecoveryCodes();
+    const next: RemoteUser = { ...current, gen: current.gen + 1, totp: { secret: pending.secret, lastStep: step, enabledAt: now, recovery: hashes } };
+    delete next.totpPending;
+    this.users.set(name, next);
+    this.commit(name);
+    return codes;
+  }
+
+  /**
+   * Confere e gasta o segundo fator: um código do aplicativo ou um de recuperação. A conferência e a gravação acontecem
+   * sem nenhum await no meio, então duas requisições com o mesmo código não passam juntas. Não derruba conexões.
+   */
+  checkSecondFactor(rawName: string, code: string): 'totp' | 'recovery' | undefined {
+    this.refresh();
+    const name = normalizeName(rawName);
+    const current = this.users.get(name);
+    if (!current?.totp) return undefined;
+    const clean = normalizeCode(code);
+    const step = matchStep(current.totp.secret, clean, this.now(), current.totp.lastStep);
+    if (step !== undefined) {
+      this.users.set(name, { ...current, totp: { ...current.totp, lastStep: step } });
+      this.save();
+      return 'totp';
+    }
+    const index = clean.length === 16 ? findRecovery(current.totp.recovery, clean) : -1;
+    if (index < 0) return undefined;
+    this.users.set(name, { ...current, totp: { ...current.totp, recovery: current.totp.recovery.filter((_, i) => i !== index) } });
+    this.save();
+    return 'recovery';
   }
 
   private assertAnotherAdmin(name: string): void {
@@ -248,6 +352,8 @@ export class UserStore {
     const name = normalizeName(this.seed.user);
     if (!NAME_RE.test(name) || !parsePasswordHash(this.seed.hashText)) return;
     const current = this.users.get(name);
+    // De propósito sem o 2FA: é a saída de quem controla o .env do servidor quando ninguém mais consegue entrar.
+    this.seedApplied = name;
     this.users.set(name, {
       name,
       role: 'admin',

@@ -18,6 +18,9 @@
 //
 // Contas e papéis: remote/users.ts e http/remote-users.ts. HABBLAUD_REMOTE_ALLOW continua sendo o teto de todos.
 //
+// HABBLAUD_REMOTE_TOTP_REQUIRED=1 (desligado por padrão): conta de Operar ou Administrar sem 2FA entra, mas só alcança a
+// página /usuarios até ativar. Ninguém fica de fora ao ligar: ver http/remote-users.ts.
+//
 // Sessão: cookie HttpOnly + SameSite=Strict (+ Secure com HTTPS) assinado com HMAC; chave = segredo aleatório em
 // <dataDir>/remote-secret misturado com usuário e hash da senha: trocar a senha derruba todas as sessões.
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
@@ -27,6 +30,7 @@ import https from 'node:https';
 import net from 'node:net';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
+import type { AuditLog } from '../remote/audit';
 import { parsePasswordHash, verifyPassword, type PasswordHash } from '../remote/password';
 import { normalizeName, type ConnectionTracker, type RemoteUser, type UserStore } from '../remote/users';
 import { hostAllowed } from './guard';
@@ -53,6 +57,8 @@ export interface RemoteConfig {
   allow: ReadonlySet<RemoteFeature>;
   /** Ausente = HTTP puro (só com HABBLAUD_REMOTE_INSECURE_HTTP=1). */
   tls?: RemoteTls;
+  /** HABBLAUD_REMOTE_TOTP_REQUIRED: Operar e Administrar sem 2FA só alcançam a página /usuarios. */
+  requireTotp?: boolean;
 }
 
 export const DEFAULT_REMOTE_PORT = 4748;
@@ -93,7 +99,16 @@ export function parseRemoteConfig(
   const port = inDocker ? DEFAULT_REMOTE_PORT : Number.isInteger(rawPort) && rawPort > 0 && rawPort < 65536 ? rawPort : DEFAULT_REMOTE_PORT;
   const host = inDocker ? '0.0.0.0' : env.HABBLAUD_REMOTE_HOST?.trim() || '0.0.0.0';
   return {
-    config: { port, host, user, passwordHash, passwordHashText: hashText, allow: parseAllow(env.HABBLAUD_REMOTE_ALLOW), tls: hasTls ? tls : undefined },
+    config: {
+      port,
+      host,
+      user,
+      passwordHash,
+      passwordHashText: hashText,
+      allow: parseAllow(env.HABBLAUD_REMOTE_ALLOW),
+      tls: hasTls ? tls : undefined,
+      requireTotp: truthy(env.HABBLAUD_REMOTE_TOTP_REQUIRED),
+    },
   };
 }
 
@@ -387,9 +402,15 @@ function esc(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-export function loginPage(opts: { caDownload: boolean }): string {
+export function loginPage(opts: { caDownload: boolean; code?: boolean }): string {
   const ca = opts.caDownload
     ? `<p class="ca">${esc(tr('Primeira vez neste celular?'))} <a href="${CA_PATH}" download="habblaud-ca.crt">${esc(tr('Instale o certificado do Habblaud'))}</a> ${esc(tr('para tirar o aviso de segurança (confira a impressão digital que o npm run remote:setup mostrou).'))}</p>`
+    : '';
+  // Num campo só, para a resposta não contar se o que falhou foi a senha ou o código. Texto livre (não numérico): também
+  // recebe os códigos de recuperação, que têm letras.
+  const code = opts.code
+    ? `<label for="c">${esc(tr('Código 2FA ou de recuperação (só se você ativou)'))}</label>
+  <input id="c" name="code" autocomplete="one-time-code" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="32">`
     : '';
   // Dentro do <script>: JSON com "<" escapado, para nenhum texto fechar a tag.
   const js = (text: string) => JSON.stringify(text).replace(/</g, '\\u003c');
@@ -434,6 +455,7 @@ export function loginPage(opts: { caDownload: boolean }): string {
   <input id="u" name="username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
   <label for="p">${esc(tr('Senha'))}</label>
   <input id="p" name="password" type="password" autocomplete="current-password" required>
+  ${code}
   <button id="b" type="submit">${esc(tr('Entrar'))}</button>
   <div id="err" role="alert"></div>
   ${ca}
@@ -445,8 +467,10 @@ export function loginPage(opts: { caDownload: boolean }): string {
     b.disabled = true; err.textContent = '';
     try {
       const r = await fetch('/api/remote/login', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-        credentials: 'same-origin', body: JSON.stringify({ user: f.username.value, password: f.password.value }) });
+        credentials: 'same-origin', body: JSON.stringify({ user: f.username.value, password: f.password.value, code: f.code ? f.code.value : '' }) });
       if (r.ok) { location.replace('/'); return; }
+      // Código é de uma vez só: o da tentativa que falhou não fica no campo.
+      if (f.code) f.code.value = '';
       const body = await r.json().catch(() => ({}));
       err.textContent = body.error || ${js(tr('Não deu para entrar.'))};
     } catch { err.textContent = ${js(tr('Sem conexão com o Habblaud.'))}; }
@@ -490,6 +514,8 @@ export interface RemoteGateDeps {
   connections?: ConnectionTracker;
   /** Rotas das contas, já com a requisição autenticada (http/remote-users.ts). */
   routes?: (req: IncomingMessage, res: ServerResponse, url: URL, who: RemoteUser) => boolean;
+  /** Registro de acessos (remote/audit.ts). */
+  audit?: AuditLog;
 }
 
 /**
@@ -537,7 +563,7 @@ export function createRemoteGate(deps: RemoteGateDeps): (req: IncomingMessage, r
         .then(async (raw) => {
           if (!limit.begin()) return tooMany();
           begun = true;
-          let body: { user?: unknown; password?: unknown } = {};
+          let body: { user?: unknown; password?: unknown; code?: unknown } = {};
           try {
             body = JSON.parse(raw) as typeof body;
           } catch {
@@ -550,8 +576,22 @@ export function createRemoteGate(deps: RemoteGateDeps): (req: IncomingMessage, r
             const stored = account && !account.disabled ? parsePasswordHash(account.hash) : undefined;
             // O scrypt roda sempre, até para conta que não existe ou está desativada.
             const matches = await verify(password, stored ?? deps.config.passwordHash);
-            if (!account || !stored || !matches) return sendJson(res, 401, { error: tr('Usuário ou senha incorretos.') });
+            const ip = req.socket.remoteAddress ?? '';
+            // A mesma resposta para senha e código errados; só o registro, que quem tentou não vê, guarda a diferença.
+            const refuse = (reason: 'credentials' | 'code') => {
+              deps.audit?.write('login.fail', { user, ip, reason });
+              sendJson(res, 401, { error: tr('Usuário, senha ou código incorretos.') });
+            };
+            if (!account || !stored || !matches) return refuse('credentials');
+            // O código só é conferido (e gasto) depois da senha certa.
+            let via: 'password' | 'totp' | 'recovery' = 'password';
+            if (account.totp) {
+              const factor = users.checkSecondFactor(account.name, typeof body.code === 'string' ? body.code : '');
+              if (!factor) return refuse('code');
+              via = factor;
+            }
             ok = true;
+            deps.audit?.write('login.ok', { user: account.name, ip, via, ...(via === 'recovery' ? { left: users.get(account.name)?.totp?.recovery.length ?? 0 } : {}) });
             const session = deps.sessions.issueFor(account.name, account.gen);
             return sendJson(res, 200, { ok: true }, { 'Set-Cookie': cookieHeader(session.token, session.maxAgeS, deps.secure) });
           }
@@ -576,6 +616,7 @@ export function createRemoteGate(deps: RemoteGateDeps): (req: IncomingMessage, r
       req.resume();
       if (method !== 'POST') sendJson(res, 405, { error: tr('método não permitido') }, { Allow: 'POST' });
       else {
+        if (who) deps.audit?.write('logout', { user: who.name, ip: req.socket.remoteAddress ?? '' });
         deps.sessions.revoke(readCookie(req.headers.cookie, COOKIE));
         sendJson(res, 200, { ok: true }, { 'Set-Cookie': cookieHeader('', 0, deps.secure) });
       }
@@ -605,7 +646,7 @@ export function createRemoteGate(deps: RemoteGateDeps): (req: IncomingMessage, r
       if (authed) {
         res.writeHead(302, { Location: '/', 'Cache-Control': 'no-store' });
         res.end();
-      } else sendHtml(res, loginPage({ caDownload: caAvailable() }));
+      } else sendHtml(res, loginPage({ caDownload: caAvailable(), code: !!users }));
       return true;
     }
 

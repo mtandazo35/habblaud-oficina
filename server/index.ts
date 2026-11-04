@@ -12,6 +12,7 @@ import { createRequestGuard, isLoopbackHost } from './http/guard';
 import { createRemoteGate, isRemoteRequest, loadSecret, LoginThrottles, RemoteSessions, remoteRequestUser, startRemoteListener, type RemoteFeature, type RemoteListener } from './http/remote';
 import type { IncomingMessage } from 'node:http';
 import { createUserRoutes } from './http/remote-users';
+import { AuditLog } from './remote/audit';
 import { ConnectionTracker, UserStore } from './remote/users';
 import { Hub } from './http/sse';
 import { createStaticHandler } from './http/static';
@@ -449,12 +450,17 @@ if (config.remote) {
   users.onChange((name) => connections.kick(name));
   users.watch();
   if (users.problem) log.warn(`   ${users.problem}.`);
+  const audit = new AuditLog(join(config.dataDir, 'remote-audit.log'), {
+    onError: (message) => log.warn(tr('   Acesso remoto: não deu para gravar o registro de acessos ({0}).', [message])),
+  });
+  if (users.seedApplied) audit.write('account.seed', { target: users.seedApplied });
   const gate = createRemoteGate({
     config: remote,
     users,
     throttles,
     connections,
-    routes: createUserRoutes({ users, throttles, allow: remote.allow }),
+    audit,
+    routes: createUserRoutes({ users, throttles, allow: remote.allow, audit, requireTotp: remote.requireTotp }),
     sessions: new RemoteSessions(loadSecret(join(config.dataDir, 'remote-secret')), remote, Date.now, join(config.dataDir, 'remote-revoked.json')),
     secure: !!remote.tls,
     caFile: remote.tls?.caFile,
@@ -481,6 +487,7 @@ if (config.remote) {
     const where = config.inDocker ? tr('publicada pelo HABBLAUD_REMOTE_BIND') : remote.host;
     const scheme = remote.tls ? 'HTTPS' : tr('HTTP SEM criptografia (HABBLAUD_REMOTE_INSECURE_HTTP)');
     log.info(tr('   Acesso remoto: ligado na porta {0} ({1}), {2}, com login; libera: {3}.', [remote.port, where, scheme, allow]));
+    if (remote.requireTotp) log.info(tr('   Acesso remoto: 2FA obrigatório para Operar e Administrar.'));
     if (remote.allow.has('spawn') && !spawn) log.warn(tr('   Acesso remoto: "spawn" liberado, mas o Novo agente está desligado (ligue com HABBLAUD_PTY=1).'));
   });
 } else if (config.remoteWarning) {

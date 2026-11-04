@@ -102,7 +102,7 @@ describe('contas: entrada', () => {
     const { base, file } = await setup();
     const cookie = await login(base, 'chefe', ADMIN_PASS);
     const me = await call(base, 'GET', '/api/remote/me', { cookie });
-    expect(me.json).toEqual({ user: 'chefe', role: 'admin', admin: true, features: ALL });
+    expect(me.json).toMatchObject({ user: 'chefe', role: 'admin', admin: true, features: ALL });
     const raw = readFileSync(file, 'utf8');
     expect(raw).not.toContain(ADMIN_PASS);
     if (process.platform !== 'win32') expect(statSync(file).mode & 0o777).toBe(0o600);
