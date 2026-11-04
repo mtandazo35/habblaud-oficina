@@ -2,7 +2,7 @@
    Fica num arquivo à parte, carregado depois de styles.css (uma linha em ui/index.ts), para que as atualizações do
    projeto original continuem entrando sem conflito. Só muda aparência: cor, tipografia, cantos, sombras e bordas.
    Medidas e posições continuam em styles.css, porque as regras do celular dependem delas.
-   Trocar uma regra aqui nunca deve exigir mexer em styles.css. O arte (sprites e cenário) não passa por este arquivo. */
+   A arte em pixels (sprites e cenário) não passa por este arquivo. */
 
 /* ------------------------------------------------------------------ marca: ponto único de troca
 
@@ -261,8 +261,17 @@
   accent-color: var(--tema-acao);
 }
 
+/* Peso igual ao das outras opções: a largura não muda ao escolher e "Automático" não encosta na borda. */
 .ui-seg__opt[aria-checked='true'] {
+  font-weight: inherit;
   box-shadow: inset 0 0 0 1px var(--ui-accent);
+}
+
+/* "Semana" não cabia nos 38 px do rótulo e encostava na barra. Só no cartão largo: os estreitos têm a sua grade. */
+@container usage-card (min-width: 237px) {
+  .ui-usage-card__meters {
+    grid-template-columns: 46px minmax(16px, 1fr) 32px auto;
+  }
 }
 
 .ui-search {
@@ -302,7 +311,8 @@
 }
 
 .ui-room-hero__swatch {
-  background: var(--room, var(--ui-accent));
+  background: var(--room);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.08);
 }
 
 .ui-toast--alert {
