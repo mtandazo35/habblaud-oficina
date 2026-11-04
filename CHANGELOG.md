@@ -12,6 +12,9 @@ do meio (0.**3**.0).
 
 ### Alterado
 
+- **Tema escuro sóbrio em volta do escritório.** Barra, painéis, cartões, Configurações, gaveta, login e `/usuarios` com
+  a mesma paleta, cantos menores e sem brilhos nem degradês. O pixel art do escritório continua igual. O tema mora em
+  `client/src/ui/theme-oficina.css`, onde também fica o ponto único para trocar o logotipo.
 - **Ver no escritório as sessões de outro computador** (por exemplo, o Claude Code do VS Code no PC). `dist/pc-sync.cjs`
   roda no computador das sessões e manda só as abertas, com os segredos já mascarados; o servidor apaga tudo quando a
   conexão acaba. É só para ver.

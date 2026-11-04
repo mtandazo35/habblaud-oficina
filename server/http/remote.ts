@@ -409,21 +409,21 @@ export function loginPage(opts: { caDownload: boolean }): string {
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
-  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #14161f; color: #e8e6df;
-         font: 16px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 16px; }
-  form { width: 100%; max-width: 360px; background: #1e2130; border: 2px solid #3a3f58; border-radius: 10px; padding: 24px; }
-  h1 { margin: 0 0 4px; font-size: 22px; color: #f4c95d; }
-  p { margin: 0 0 20px; color: #9aa0b8; font-size: 13px; }
+  body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #0e1116; color: #e6e9ee;
+         font: 16px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; padding: 16px; }
+  form { width: 100%; max-width: 360px; background: #151a21; border: 1px solid #2f3945; border-radius: 6px; padding: 24px; }
+  h1 { margin: 0 0 4px; font-size: 20px; color: #e6e9ee; }
+  p { margin: 0 0 20px; color: #a8b1bd; font-size: 13px; }
   p.ca { margin: 20px 0 0; }
-  a { color: #f4c95d; }
-  code { color: #e8e6df; }
-  label { display: block; font-size: 13px; color: #9aa0b8; margin: 12px 0 6px; }
-  input { width: 100%; padding: 12px; font: inherit; color: inherit; background: #14161f; border: 2px solid #3a3f58; border-radius: 6px; }
-  input:focus { outline: none; border-color: #f4c95d; }
-  button { width: 100%; margin-top: 20px; padding: 12px; font: inherit; font-weight: 700; color: #14161f; background: #f4c95d;
-           border: 0; border-radius: 6px; cursor: pointer; }
+  a { color: #7fb8e0; }
+  code { color: #e6e9ee; }
+  label { display: block; font-size: 13px; color: #a8b1bd; margin: 12px 0 6px; }
+  input { width: 100%; padding: 12px; font: inherit; color: inherit; background: #0e1116; border: 1px solid #66717f; border-radius: 4px; }
+  input:focus { outline: 2px solid #7fb8e0; border-color: #7fb8e0; }
+  button { width: 100%; margin-top: 20px; padding: 12px; font: inherit; font-weight: 600; color: #fff; background: #2f76b0;
+           border: 0; border-radius: 4px; cursor: pointer; }
   button:disabled { opacity: .6; cursor: wait; }
-  #err { min-height: 20px; margin-top: 12px; color: #ff8a80; font-size: 13px; }
+  #err { min-height: 20px; margin-top: 12px; color: #f27a76; font-size: 13px; }
 </style>
 </head>
 <body>

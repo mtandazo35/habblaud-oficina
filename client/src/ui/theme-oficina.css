@@ -1,0 +1,332 @@
+/* Tema "Oficina": escuro sóbrio, de painel técnico, em volta do escritório em pixel art.
+   Fica num arquivo à parte, carregado depois de styles.css (uma linha em ui/index.ts), para que as atualizações do
+   projeto original continuem entrando sem conflito. Só muda aparência: cor, tipografia, cantos, sombras e bordas.
+   Medidas e posições continuam em styles.css, porque as regras do celular dependem delas.
+   Trocar uma regra aqui nunca deve exigir mexer em styles.css. O arte (sprites e cenário) não passa por este arquivo. */
+
+/* ------------------------------------------------------------------ marca: ponto único de troca
+
+   A marca ainda é a do Habblaud. Quando o logotipo definitivo chegar, basta preencher estas duas variáveis:
+     --marca-logo: url('/assets/brand/nome-do-arquivo.png');  imagem quadrada, no lugar do prédio (barra e abertura);
+     --marca-nome-exibir: none;                               esconde o nome "Habblaud" em pixels ao lado dele.
+   O arquivo vai em client/public/assets/brand/. O ícone da aba (favicon-*.png) e o do celular (apple-touch-icon.png)
+   estão na mesma pasta e são trocados substituindo os arquivos. As páginas de login e /usuarios mostram "Habblaud"
+   como texto, em server/http/remote.ts e server/http/remote-users.ts. */
+
+.ui-root {
+  --marca-logo: normal;
+  --marca-nome-exibir: block;
+}
+
+.ui-brand__mark img {
+  content: var(--marca-logo);
+}
+
+.ui-wordmark {
+  display: var(--marca-nome-exibir);
+}
+
+/* ------------------------------------------------------------------ variáveis
+
+   Contraste calculado sobre o painel (#12161c): texto 15,2:1; secundário 8,1:1; apagado 6,1:1; destaque 8,8:1.
+   Cor de status é informação: as famílias continuam as mesmas do original, só menos saturadas. */
+
+.ui-root {
+  --ui-bg: rgba(18, 22, 28, 0.97);
+  --ui-bg-solid: #12161c;
+  --ui-bg-soft: rgba(255, 255, 255, 0.03);
+  --ui-bg-hover: rgba(255, 255, 255, 0.07);
+  --ui-line: rgba(148, 163, 184, 0.17);
+  --ui-line-strong: rgba(148, 163, 184, 0.34);
+  --ui-text: #e6e9ee;
+  --ui-muted: #a8b1bd;
+  --ui-faint: #8f99a6;
+  --ui-accent: #7fb8e0;
+  --ui-accent-soft: rgba(127, 184, 224, 0.14);
+
+  --tema-barra: #0e1116;
+  --tema-acao: #2f76b0;
+  --tema-acao-hover: #286799;
+  --tema-acao-borda: #4b90c8;
+
+  --st-working: #55c98e;
+  --st-waiting: #eeb04f;
+  --st-shell: #45c4bf;
+  --st-idle: #8f99a6;
+  --st-done: #74a9e6;
+  --st-offline: #6b7280;
+
+  --lv-ok: #55c98e;
+  --lv-warn: #eeb04f;
+  --lv-crit: #f27a76;
+
+  /* Rótulos fixos saem da fonte em pixels: o pixel art fica só no escritório, e assim ele se destaca. */
+  --font-px: var(--font-ui);
+
+  --radius: 6px;
+  --radius-sm: 4px;
+}
+
+/* ------------------------------------------------------------------ foco do teclado */
+
+.ui-root :focus-visible {
+  outline: 2px solid var(--ui-accent);
+  outline-offset: 2px;
+}
+
+/* A busca e os campos com borda própria: o anel fica colado na borda, sem invadir o vizinho. */
+.ui-search:focus-within {
+  border-color: var(--ui-accent);
+  outline: 1px solid var(--ui-accent);
+  outline-offset: 0;
+}
+
+.ui-root input:focus-visible,
+.ui-root textarea:focus-visible,
+.ui-root select:focus-visible {
+  outline-offset: 0;
+}
+
+.ui-root .ui-search__input:focus-visible {
+  outline: 0;
+}
+
+/* ------------------------------------------------------------------ superfícies
+
+   O backdrop-filter original fica onde está: além do desfoque, ele é o bloco de contenção de peças fixas da barra
+   (dicas de uso, por exemplo). Com o fundo quase opaco, o desfoque deixa de aparecer sem mudar o comportamento. */
+
+.ui-panel {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
+.ui-topbar {
+  background: var(--tema-barra);
+  box-shadow: none;
+}
+
+.ui-popover,
+.ui-dialog {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.ui-dialog::backdrop {
+  background: rgba(6, 8, 11, 0.62);
+}
+
+.ui-splash {
+  background: var(--tema-barra);
+}
+
+.ui-root,
+.ui-root * {
+  scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
+}
+
+/* ------------------------------------------------------------------ títulos de seção */
+
+.ui-side__title h2,
+.ui-feed__title h2,
+.ui-drawer__kind,
+.ui-sec__title,
+.ui-set-group h3 {
+  font: 600 11px/1.2 var(--font-ui);
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ui-muted);
+}
+
+.ui-popover__head h2 {
+  font: 600 14px/1.2 var(--font-ui);
+}
+
+.ui-dialog__head h2 {
+  font: 600 16px/1.2 var(--font-ui);
+}
+
+.ui-alert__title {
+  font: 600 13px/1.25 var(--font-ui);
+}
+
+/* ------------------------------------------------------------------ cantos: 6 px em superfícies, 4 px em controles */
+
+.ui-usage-card,
+.ui-counters,
+.ui-btn-group,
+.ui-room,
+.ui-alert,
+.ui-toast,
+.ui-popover,
+.ui-dialog,
+.ui-tip,
+.ui-banner,
+.ui-perm,
+.ui-shell,
+.ui-term__alert,
+.ui-deliv-card,
+.ui-deliv-modal,
+.ui-deliv-toast,
+.ui-day__kpi,
+.ui-day__card,
+.ui-day__account,
+.ui-world-dialog,
+.ui-world-popup,
+.ui-world-sent,
+.ui-world__building,
+.ui-avatar--lg {
+  border-radius: 6px;
+}
+
+.ui-counter,
+.ui-search,
+.ui-acc-filter,
+.ui-agent,
+.ui-gone,
+.ui-hero__title,
+.ui-now__icon,
+.ui-now__details pre,
+.ui-shell__cmd pre,
+.ui-seg,
+.ui-seg__opt,
+.ui-switch,
+.ui-hist__item,
+.ui-spawn__folder,
+.ui-spawn__file,
+.ui-rename,
+.ui-term__search,
+.ui-pill,
+.ui-version,
+.ui-feed__filter,
+.ui-toast__count,
+.ui-avatar {
+  border-radius: 4px;
+}
+
+.ui-room__head {
+  border-radius: 6px 6px 0 0;
+}
+
+/* ------------------------------------------------------------------ botões e controles */
+
+.ui-btn:hover {
+  border-color: rgba(148, 163, 184, 0.5);
+}
+
+.ui-btn.is-on {
+  border-color: var(--ui-accent);
+}
+
+.ui-btn--primary,
+.ui-term__new {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  background: var(--tema-acao);
+  border-color: var(--tema-acao-borda);
+  color: #fff;
+  box-shadow: none;
+}
+
+.ui-btn--primary {
+  font-size: 13px;
+  letter-spacing: 0;
+}
+
+.ui-btn--primary:hover,
+.ui-term__new:hover {
+  background: var(--tema-acao-hover);
+}
+
+.ui-kbd {
+  border-bottom-width: 1px;
+  border-radius: 3px;
+  background: none;
+}
+
+.ui-switch {
+  border-radius: 4px;
+}
+
+.ui-switch[aria-checked='true'] {
+  background: var(--tema-acao);
+  border-color: var(--tema-acao-borda);
+}
+
+.ui-switch__knob {
+  border-radius: 2px;
+  box-shadow: none;
+}
+
+.ui-snd__range,
+.ui-world__checkbox {
+  accent-color: var(--tema-acao);
+}
+
+.ui-seg__opt[aria-checked='true'] {
+  box-shadow: inset 0 0 0 1px var(--ui-accent);
+}
+
+.ui-search {
+  background: rgba(0, 0, 0, 0.28);
+  border-color: var(--ui-line-strong);
+}
+
+/* ------------------------------------------------------------------ peças sem adorno: relevos, brilhos e degradês
+
+   Os degradês em faixas das barras de uso ficam: eles desenham os segmentos, não enfeitam. */
+
+.ui-acc-chip,
+.ui-acc-chip--lg {
+  box-shadow: none;
+}
+
+.ui-acc-chip[data-provider='codex'] {
+  box-shadow: inset 0 0 0 var(--step) var(--acc);
+}
+
+.ui-status-dot,
+.ui-status-dot.is-idle,
+.ui-pill__dot {
+  box-shadow: none;
+}
+
+.ui-meter__fill {
+  filter: none;
+}
+
+.ui-avatar {
+  background: color-mix(in srgb, var(--acc, #8f99a6) 22%, #1a2028);
+}
+
+.ui-usage-card {
+  background: var(--ui-bg-soft);
+}
+
+.ui-room-hero__swatch {
+  background: var(--room, var(--ui-accent));
+}
+
+.ui-toast--alert {
+  background: color-mix(in srgb, var(--st-waiting) 12%, var(--ui-bg-solid));
+}
+
+.ui-feed__item.is-shell-ok .ui-feed__row {
+  background: rgba(85, 201, 142, 0.08);
+}
+
+.ui-feed__item.is-shell-fail .ui-feed__row {
+  background: rgba(242, 122, 118, 0.1);
+}
+
+.ui-deliv-card {
+  background: var(--ui-bg-soft);
+}
+
+.ui-world-dialog__head,
+.ui-world-popup__head {
+  background: var(--ui-bg-soft);
+}
+
+.ui-world-dialog__badge,
+.ui-world-popup__badge {
+  background: var(--ui-accent-soft);
+}

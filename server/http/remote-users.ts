@@ -208,28 +208,28 @@ export function usersPage(): string {
 <style>
   :root { color-scheme: dark; }
   * { box-sizing: border-box; }
-  body { margin: 0; background: #14161f; color: #e8e6df; font: 15px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 16px; }
+  body { margin: 0; background: #0e1116; color: #e6e9ee; font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; padding: 16px; }
   main { max-width: 860px; margin: 0 auto; }
-  h1 { margin: 0; font-size: 22px; color: #f4c95d; }
-  h2 { margin: 0 0 12px; font-size: 16px; color: #f4c95d; }
+  h1 { margin: 0; font-size: 20px; color: #e6e9ee; }
+  h2 { margin: 0 0 12px; font-size: 15px; color: #e6e9ee; }
   header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
-  a { color: #f4c95d; }
-  section { background: #1e2130; border: 2px solid #3a3f58; border-radius: 10px; padding: 16px; margin-bottom: 16px; }
-  label { display: block; font-size: 13px; color: #9aa0b8; margin: 10px 0 4px; }
-  input, select { width: 100%; padding: 10px; font: inherit; color: inherit; background: #14161f; border: 2px solid #3a3f58; border-radius: 6px; }
-  input:focus, select:focus { outline: none; border-color: #f4c95d; }
-  button { padding: 9px 12px; font: inherit; color: #e8e6df; background: #2b2f44; border: 2px solid #3a3f58; border-radius: 6px; cursor: pointer; }
+  a { color: #7fb8e0; }
+  section { background: #151a21; border: 1px solid #2f3945; border-radius: 6px; padding: 16px; margin-bottom: 16px; }
+  label { display: block; font-size: 13px; color: #a8b1bd; margin: 10px 0 4px; }
+  input, select { width: 100%; padding: 10px; font: inherit; color: inherit; background: #0e1116; border: 1px solid #66717f; border-radius: 4px; }
+  input:focus, select:focus { outline: 2px solid #7fb8e0; border-color: #7fb8e0; }
+  button { padding: 9px 12px; font: inherit; color: #e6e9ee; background: #1c232c; border: 1px solid #66717f; border-radius: 4px; cursor: pointer; }
   button:disabled { opacity: .5; cursor: not-allowed; }
-  button.main { color: #14161f; font-weight: 700; background: #f4c95d; border-color: #f4c95d; }
-  button.danger { color: #ff8a80; }
+  button.main { color: #fff; font-weight: 600; background: #2f76b0; border-color: #4b90c8; }
+  button.danger { color: #f27a76; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 0 12px; }
   .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-  .user { border-top: 1px solid #3a3f58; padding: 12px 0; }
+  .user { border-top: 1px solid #2f3945; padding: 12px 0; }
   .user:first-child { border-top: 0; padding-top: 0; }
-  .name { font-weight: 700; overflow-wrap: anywhere; }
-  .muted { color: #9aa0b8; font-size: 13px; }
-  .off { color: #ff8a80; }
-  dialog { width: min(92vw, 440px); color: inherit; background: #1e2130; border: 2px solid #f4c95d; border-radius: 10px; padding: 18px; overflow-wrap: anywhere; }
+  .name { font-weight: 600; overflow-wrap: anywhere; }
+  .muted { color: #a8b1bd; font-size: 13px; }
+  .off { color: #f27a76; }
+  dialog { width: min(92vw, 440px); color: inherit; background: #151a21; border: 1px solid #66717f; border-radius: 6px; padding: 18px; overflow-wrap: anywhere; }
   dialog::backdrop { background: rgba(0, 0, 0, .65); }
 </style>
 </head>
