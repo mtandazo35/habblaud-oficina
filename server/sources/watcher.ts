@@ -13,7 +13,7 @@ import type { Activity, AgentStatus, SourceInfo } from '../../shared/types';
 import type { AccountsService } from '../accounts/service';
 import { errMsg, log } from '../log';
 import type { Office, TranscriptSummary } from '../model/office';
-import { compareVersions, registryStatus, RegistryReader, SHELL_STATUS_VERSION, type RegistryEntry } from './registry';
+import { compareVersions, pidAlive, registryStatus, RegistryReader, SHELL_STATUS_VERSION, type RegistryEntry } from './registry';
 import { SHELL_FALLBACK_MAX_AGE_MS, ShellTracker, toShellJob, type ShellFinish } from './shells';
 import type { AgentSource } from './source';
 import {
@@ -268,7 +268,11 @@ export class ClaudeWatcher implements AgentSource {
     for (const acc of this.opts.accounts.entries()) {
       let reader = this.readers.get(acc.dir);
       if (!reader) {
-        reader = new RegistryReader(acc.dir, { checkPid: !this.opts.inDocker, isAlive: this.opts.isAlive });
+        // Conta espelhada de outro computador (scripts/pc-receive.mjs): os PIDs são de lá, e quem diz que a sessão
+        // acabou é o próprio espelho, tirando o arquivo do registro.
+        const mirrored = join(acc.dir, '.habblaud-remote');
+        const isAlive = this.opts.isAlive ?? pidAlive;
+        reader = new RegistryReader(acc.dir, { checkPid: !this.opts.inDocker, isAlive: (pid) => existsSync(mirrored) || isAlive(pid) });
         this.readers.set(acc.dir, reader);
         this.watchDir(join(acc.dir, 'sessions'));
       }

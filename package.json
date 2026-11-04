@@ -44,6 +44,7 @@
     "codex:bridge": "tsx scripts/codex-bridge.ts",
     "remote:setup": "tsx scripts/remote-setup.ts",
     "remote:users": "tsx scripts/remote-users.ts",
+    "build:pc-sync": "esbuild scripts/pc-sync.ts --bundle --platform=node --format=cjs --outfile=dist/pc-sync.cjs --log-level=warning",
     "remote:mdns": "tsx scripts/remote-mdns.ts",
     "release": "tsx scripts/release.ts"
   },

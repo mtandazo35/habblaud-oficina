@@ -12,6 +12,9 @@ do meio (0.**3**.0).
 
 ### Alterado
 
+- **Ver no escritório as sessões de outro computador** (por exemplo, o Claude Code do VS Code no PC). `dist/pc-sync.cjs`
+  roda no computador das sessões e manda só as abertas, com os segredos já mascarados; o servidor apaga tudo quando a
+  conexão acaba. É só para ver.
 - **Contas e papéis no acesso remoto.** Cada pessoa tem o seu usuário e um papel: Ver, Aprovar, Operar ou Administrar. A
   página `/usuarios` cria, desativa e remove contas, troca senhas e encerra sessões; `npm run remote:users` faz o mesmo
   pelo servidor. Desativar corta na hora as conexões abertas. A conta do `.env` vira a primeira administradora, com a
