@@ -159,6 +159,10 @@ describe('segredos mascarados', () => {
     expect(maskSecrets("printf 'root:clave\\n' | /usr/sbin/chpasswd")).toBe('printf *** | /usr/sbin/chpasswd');
     expect(maskSecrets('echo clave | sudo -S passwd root')).toBe('echo *** | sudo -S passwd root');
     expect(maskSecrets('chpasswd <<< "root:clave"')).toBe('chpasswd <<< ***');
+    // Comando citado dentro de outro texto: as aspas chegam escapadas (visto de verdade num transcript).
+    expect(maskSecrets('{"cmd":"echo \\"root:clave\\" | chpasswd"}')).toBe('{"cmd":"echo *** | chpasswd"}');
+    expect(maskSecrets('echo \\"root:clave\\" | sudo chpasswd')).toBe('echo *** | sudo chpasswd');
+    expect(maskSecrets('mysql -e \\"select 1\\" -pclave')).toBe('mysql -e \\"select 1\\" -p***');
     expect(maskSecrets("chpasswd <<'EOF'\nroot:clave\nEOF\nls")).toBe("chpasswd <<'EOF'\n***\nEOF\nls");
     expect(maskSecrets('cat <<EOF | sudo chpasswd\nroot:clave\nadmin:otra\nEOF')).toBe('cat <<EOF | sudo chpasswd\n***\nEOF');
     for (const s of ['echo hola | grep chpasswd', 'grep root /etc/passwd', 'man chpasswd', 'chpasswd < /root/lista']) {

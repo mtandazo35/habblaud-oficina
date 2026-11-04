@@ -106,14 +106,14 @@ const SECRET_PATTERNS: Array<[RegExp, string]> = [
   // mysql -pX, mysqldump -p'X', mariadb-dump -pX (`-p` sozinho só pede a senha e fica).
   [
     new RegExp(
-      String.raw`(\b(?:mysql(?:dump|admin|import|show|check|binlog|slap)?|mariadb(?:-dump|-admin|-import|-show|-check|-binlog|-slap)?)\b(?:'[^']*'|"(?:[^"\\]|\\.)*"|[^\n|;&'"]){0,400}?\s-p)${SHELL_VALUE}`,
+      String.raw`(\b(?:mysql(?:dump|admin|import|show|check|binlog|slap)?|mariadb(?:-dump|-admin|-import|-show|-check|-binlog|-slap)?)\b(?:\\.|'[^']*'|"(?:[^"\\]|\\.)*"|[^\n|;&'"]){0,400}?\s-p)${SHELL_VALUE}`,
       'g',
     ),
     '$1***',
   ],
   // echo usuario:senha | chpasswd, printf ... | sudo passwd.
   [
-    /\b(echo|printf)\s(?:'[^']*'|"(?:[^"\\]|\\.)*"|[^|\n'"]){0,400}?\|\s*((?:sudo\b[^|\n;&]*?\s)?(?:[\w./-]*\/)?(?:chpasswd|passwd)\b)/g,
+    /\b(echo|printf)\s(?:\\.|'[^']*'|"(?:[^"\\]|\\.)*"|[^|\n'"]){0,400}?\|\s*((?:sudo\b[^|\n;&]*?\s)?(?:[\w./-]*\/)?(?:chpasswd|passwd)\b)/g,
     '$1 *** | $2',
   ],
   // chpasswd <<< "usuario:senha".

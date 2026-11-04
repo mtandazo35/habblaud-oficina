@@ -35,6 +35,8 @@ Crea la cuenta `habblaud`, instala Node y Claude Code si faltan, y deja el panel
 
 **Usuarios.** Cada persona entra con su cuenta y un rol: **Ver**, **Aprobar**, **Operar** o **Administrar**. Se gestionan en `/usuarios` (Ajustes › Usuarios) o en el servidor con `npm run remote:users -- list`. El rol Operar puede ejecutar comandos en el servidor: dáselo solo a gente de total confianza. Si pierdes el acceso, `npm run remote:users -- passwd <usuario>` genera una contraseña nueva.
 
+**Ver en el panel el Claude de otro equipo.** Para ver, por ejemplo, tu VS Code del PC, en el servidor añade `HABBLAUD_CLAUDE_DIRS=~/.claude,~/.claude-pc` al `.env`, crea `~/.claude-pc` y reinicia. Compila con `npm run build:pc-sync`, copia `dist/pc-sync.cjs` al otro equipo y ejecuta `node pc-sync.cjs usuario@servidor` (necesita Node y SSH con clave). Solo envía las sesiones abiertas, con las claves ya enmascaradas, y el servidor borra todo al cortarse la conexión. El enmascarado es una lista de patrones: lo que no reconozca viaja tal cual. Solo sirve para ver y lo ven todas las cuentas del panel.
+
 **Copia de [marmottajr/habblaud](https://github.com/marmottajr/habblaud) (MIT).** Se diferencia en esto: oculta más contraseñas en el panel (`sshpass`, `mysql -p`, `chpasswd`), tiene cuentas con roles, trae este instalador, y la ciudad online y el aviso de versión nueva vienen apagados (`HABBLAUD_WORLD=1` y `HABBLAUD_UPDATE_CHECK=1` los activan). El resto de este documento es el del proyecto original.
 
 ---
