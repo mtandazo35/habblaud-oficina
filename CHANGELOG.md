@@ -10,6 +10,11 @@ do meio (0.**3**.0).
 
 ## [Não lançado]
 
+### Corrigido
+
+- **Senhas em comandos de shell não aparecem mais no painel.** `sshpass -p`, `SSHPASS=`, `mysql -pX` e parentes,
+  `echo usuário:senha | chpasswd` (também com `<<<` e heredoc) e `echo senha | passwd` agora são mascarados.
+
 ## [1.0.3] - 2026-10-16
 
 ### Corrigido

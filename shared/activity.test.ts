@@ -128,6 +128,44 @@ describe('segredos mascarados', () => {
     expect(maskSecrets(s)).toBe(s);
   });
 
+  it('sshpass: a senha some em qualquer forma, a porta do ssh fica', () => {
+    expect(maskSecrets('sshpass -p clave123 ssh root@192.0.2.10')).toBe('sshpass -p *** ssh root@192.0.2.10');
+    expect(maskSecrets("sshpass -p 'clave con espacio' ssh h")).toBe('sshpass -p *** ssh h');
+    expect(maskSecrets('sshpass -p "clave con \\" comilla" ssh h')).toBe('sshpass -p *** ssh h');
+    expect(maskSecrets('sshpass -pclave ssh h')).toBe('sshpass -p*** ssh h');
+    expect(maskSecrets('sshpass -v -p clave scp a h:')).toBe('sshpass -v -p *** scp a h:');
+    expect(maskSecrets('SSHPASS=clave sshpass -e ssh h')).toBe('SSHPASS=*** sshpass -e ssh h');
+    expect(maskSecrets("export DB_PASS='a b'")).toBe('export DB_PASS=***');
+    for (const s of ['sshpass -f /root/.p ssh -p 2232 h', 'sshpass -e ssh -p 2232 h', 'ssh -p 2232 root@h']) {
+      expect(maskSecrets(s)).toBe(s);
+    }
+    expect(describeCommand('sshpass -p clave123 ssh root@192.0.2.10 uptime').detail).toBe('sshpass -p *** ssh root@192.0.2.10 uptime');
+  });
+
+  it('mysql: -pX some, -p sozinho e -P (porta) ficam', () => {
+    expect(maskSecrets('mysql -uroot -pclave db')).toBe('mysql -uroot -p*** db');
+    expect(maskSecrets("mysqldump -u root -p'a b' db")).toBe('mysqldump -u root -p*** db');
+    expect(maskSecrets('mariadb-dump -pclave db')).toBe('mariadb-dump -p*** db');
+    expect(maskSecrets('docker exec x mysql -e "select 1; select 2" -pclave')).toBe('docker exec x mysql -e "select 1; select 2" -p***');
+    for (const s of ['mysql -u root -p db', 'mysql -P3306 -h h', 'mysql --protocol=tcp', 'cd /var/lib/mysql && mkdir -p nuevo']) {
+      expect(maskSecrets(s)).toBe(s);
+    }
+  });
+
+  it('chpasswd e passwd: a linha usuário:senha some', () => {
+    expect(maskSecrets('echo root:clave | chpasswd')).toBe('echo *** | chpasswd');
+    expect(maskSecrets("echo 'root:a|b c' | sudo chpasswd")).toBe('echo *** | sudo chpasswd');
+    expect(maskSecrets('ssh h "echo root:clave | chpasswd"')).toBe('ssh h "echo *** | chpasswd"');
+    expect(maskSecrets("printf 'root:clave\\n' | /usr/sbin/chpasswd")).toBe('printf *** | /usr/sbin/chpasswd');
+    expect(maskSecrets('echo clave | sudo -S passwd root')).toBe('echo *** | sudo -S passwd root');
+    expect(maskSecrets('chpasswd <<< "root:clave"')).toBe('chpasswd <<< ***');
+    expect(maskSecrets("chpasswd <<'EOF'\nroot:clave\nEOF\nls")).toBe("chpasswd <<'EOF'\n***\nEOF\nls");
+    expect(maskSecrets('cat <<EOF | sudo chpasswd\nroot:clave\nadmin:otra\nEOF')).toBe('cat <<EOF | sudo chpasswd\n***\nEOF');
+    for (const s of ['echo hola | grep chpasswd', 'grep root /etc/passwd', 'man chpasswd', 'chpasswd < /root/lista']) {
+      expect(maskSecrets(s)).toBe(s);
+    }
+  });
+
   it('shell: palavras e segmentos', () => {
     expect(shellWords(`a 'b c' "d \\"e\\"" f\\ g ''`)).toEqual(['a', 'b c', 'd "e"', 'f g', '']);
     expect(splitShell('a && b | c; d & e 2>&1 || f "x|y" $(g; h)')).toEqual(['a', 'b', 'c', 'd', 'e 2>&1', 'f "x|y" $(g; h)']);
