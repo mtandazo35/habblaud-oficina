@@ -23,7 +23,7 @@
 // 4. Roda `docker compose up -d --build`, espera o /api/health e mostra a URL.
 // 5. Diz no fim se o Habblaud World está ligado (HABBLAUD_WORLD_URL do ambiente ou do .env, conferida como o servidor
 //    confere) e para qual servidor; sem a variável, vem ligado apontando para server.habblaud.com ("(padrão)"), e
-//    HABBLAUD_WORLD=0 desliga tudo.
+//    Desligado por padrão: HABBLAUD_WORLD=1 liga.
 // 6. Atualiza o mod do Habblaud nas contas onde ele JÁ está instalado com outra versão (depois de
 //    atualizar o Habblaud): relê o marketplace desta pasta e roda `claude plugin update` com o
 //    CLAUDE_CONFIG_DIR de cada conta. Nunca instala sozinho; se o `claude` faltar ou falhar, é só um aviso. Numa
