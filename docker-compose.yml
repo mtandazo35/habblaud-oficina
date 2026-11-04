@@ -47,6 +47,8 @@ services:
       HABBLAUD_REMOTE_PASSWORD_HASH: ${HABBLAUD_REMOTE_PASSWORD_HASH:-}
       HABBLAUD_REMOTE_ALLOW: ${HABBLAUD_REMOTE_ALLOW:-}
       HABBLAUD_REMOTE_INSECURE_HTTP: ${HABBLAUD_REMOTE_INSECURE_HTTP:-}
+      # Contas de agentes que só um usuário de login vê pela porta remota (server/http/privacy.ts).
+      HABBLAUD_PRIVATE_DIRS: ${HABBLAUD_PRIVATE_DIRS:-}
       # Habblaud World (desligado por padrão; HABBLAUD_WORLD=1 liga: server.habblaud.com; nada sai antes de criar a conta).
       HABBLAUD_WORLD: ${HABBLAUD_WORLD:-}
       HABBLAUD_WORLD_URL: ${HABBLAUD_WORLD_URL:-}

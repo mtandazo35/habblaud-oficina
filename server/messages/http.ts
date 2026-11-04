@@ -27,7 +27,7 @@ function fail(res: ServerResponse, err: unknown): void {
   else sendJson(res, 500, { error: tr('erro interno') });
 }
 
-export function createMessageRoutes(registry: MessageRegistry): (req: IncomingMessage, res: ServerResponse, path: string) => void {
+export function createMessageRoutes(registry: Pick<MessageRegistry, 'send' | 'get' | 'inbox' | 'ack' | 'codexPoll' | 'codexAck'>): (req: IncomingMessage, res: ServerResponse, path: string) => void {
   const send = async (req: IncomingMessage, res: ServerResponse) => {
     const r = registry.send(await readJson(req));
     if ('message' in r) return sendJson(res, 201, r.message);

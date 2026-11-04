@@ -19,7 +19,7 @@ export interface SessionRoutesDeps {
   /** Ausente = recurso desligado (sem bind local). */
   history?: SessionLookup;
   /** Ausente = terminal desligado. */
-  terminals?: TerminalStreams;
+  terminals?: Pick<TerminalStreams, 'attachSession'>;
   /** Porta remota (http/remote.ts): a decisão já tomada pela API; ausente = trava do Host local, como antes. */
   trusted?: boolean;
 }

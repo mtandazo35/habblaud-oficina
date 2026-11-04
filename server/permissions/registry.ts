@@ -454,6 +454,11 @@ export class PermissionRegistry {
     return this.opts.demoDetail?.(id);
   }
 
+  /** O agente de um pedido real (do demo ou desconhecido = undefined). */
+  agentOf(id: string): string | undefined {
+    return this.pending.get(id)?.agentId;
+  }
+
   /**
    * Pedido mais antigo de cada agente (sem `input`, que só sai pelo detalhe), com quantos esperam depois
    * dele. É o que o Office põe no snapshot.

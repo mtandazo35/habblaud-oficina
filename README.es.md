@@ -35,7 +35,7 @@ Crea la cuenta `habblaud`, instala Node y Claude Code si faltan, y deja el panel
 
 **Usuarios.** Cada persona entra con su cuenta y un rol: **Ver**, **Aprobar**, **Operar** o **Administrar**. Se gestionan en `/usuarios` (Ajustes › Usuarios) o en el servidor con `npm run remote:users -- list`. El rol Operar puede ejecutar comandos en el servidor: dáselo solo a gente de total confianza. Si pierdes el acceso, `npm run remote:users -- passwd <usuario>` genera una contraseña nueva.
 
-**Ver en el panel el Claude de otro equipo.** Para ver, por ejemplo, tu VS Code del PC, en el servidor añade `HABBLAUD_CLAUDE_DIRS=~/.claude,~/.claude-pc` al `.env`, crea `~/.claude-pc` y reinicia. Compila con `npm run build:pc-sync`, copia `dist/pc-sync.cjs` al otro equipo y ejecuta `node pc-sync.cjs usuario@servidor` (necesita Node y SSH con clave). Solo envía las sesiones abiertas, con las claves ya enmascaradas, y el servidor borra todo al cortarse la conexión. El enmascarado es una lista de patrones: lo que no reconozca viaja tal cual. Solo sirve para ver y lo ven todas las cuentas del panel.
+**Ver en el panel el Claude de otro equipo.** Para ver, por ejemplo, tu VS Code del PC, en el servidor añade `HABBLAUD_CLAUDE_DIRS=~/.claude,~/.claude-pc` al `.env`, crea `~/.claude-pc` y reinicia. Compila con `npm run build:pc-sync`, copia `dist/pc-sync.cjs` al otro equipo y ejecuta `node pc-sync.cjs usuario@servidor` (necesita Node y SSH con clave). Solo envía las sesiones abiertas, con las claves ya enmascaradas, y el servidor borra todo al cortarse la conexión. El enmascarado es una lista de patrones: lo que no reconozca viaja tal cual. Solo sirve para ver y lo ven todas las cuentas del panel, salvo que lo reserves a una: con `HABBLAUD_PRIVATE_DIRS=~/.claude-pc=usuario` en el `.env`, por el puerto remoto solo ese usuario ve esa cuenta, ni siquiera un administrador (consulta la tabla de variables).
 
 **Copia de [marmottajr/habblaud](https://github.com/marmottajr/habblaud) (MIT).** Se diferencia en esto: oculta más contraseñas en el panel (`sshpass`, `mysql -p`, `chpasswd`), tiene cuentas con roles, trae este instalador, y la ciudad online y el aviso de versión nueva vienen apagados (`HABBLAUD_WORLD=1` y `HABBLAUD_UPDATE_CHECK=1` los activan). El resto de este documento es el del proyecto original.
 
@@ -775,6 +775,7 @@ Todo funciona sin configurar nada. Si necesitas ajustar algo, usa variables de e
 | `HABBLAUD_PTY` | desactivada | `1` activa la terminal interactiva (abrir, tomar el control y cerrar sesiones de Claude Code desde la oficina; solo con acceso local y fuera de Docker) y **Nuevo agente** (también en Docker, a través de `npm run codex:bridge`). Lee el aviso en [Privacidad y seguridad](#privacidad-y-seguridad). |
 | `HABBLAUD_CLAUDE_BIN` | `claude` del PATH | El ejecutable de Claude Code que ejecutan la terminal interactiva y Nuevo agente. |
 | `HABBLAUD_REMOTE_ALLOW` | `permissions` | Lo que puede hacer el [celular con inicio de sesión](#celular-con-inicio-de-sesión-y-https-aprobar-solicitudes): `permissions`, `messages`, `terminal`, `spawn` (separados por comas) o `none`. Las demás `HABBLAUD_REMOTE_*` las escribe `npm run remote:setup`. |
+| `HABBLAUD_PRIVATE_DIRS` | — | Cuentas de agentes reservadas a un usuario del puerto remoto: `<carpeta>=<usuario>`, separadas por comas (p. ej., `~/.claude-pc=usuario`). Los demás usuarios, también los administradores, no ven esas sesiones en ninguna pantalla ni contador. Una entrada sin usuario válido no la ve nadie por el puerto remoto. El puerto local no cambia. En Docker, usa la ruta de la carpeta en el host. Mi día y timelapse de quien no ve todo empiezan a grabarse al activarla. Quien pueda mandar mensajes o abrir agentes (`messages`, `spawn`) los hace correr con el mismo usuario del sistema, que sí puede leer la carpeta: para una reserva estricta, deja a los demás con el papel Ver. |
 | `HABBLAUD_MENSAGENS` | activados (con la terminal) | `0` desactiva solo los mensajes desde la oficina (el cuadro en la terminal y en los detalles del agente). |
 | `HABBLAUD_CODEX` | activado | `0` desactiva Codex en la oficina. |
 | `HABBLAUD_CODEX_DIRS` | detección automática | Carpetas de Codex, separadas por comas (en lugar de `~/.codex*` y `CODEX_HOME`). |
@@ -784,8 +785,8 @@ Todo funciona sin configurar nada. Si necesitas ajustar algo, usa variables de e
 | `HABBLAUD_ACCOUNTS` | — | JSON para personalizar el nombre, la letra o el color, emparejado por el nombre de la carpeta de la cuenta. P. ej.: `[{"id":".claude-conta2","name":"Trabalho","short":"T","color":"#5cc97b"}]`. |
 
 **En Docker**, valen `HABBLAUD_PORT`, `HABBLAUD_BIND`, `HABBLAUD_ALLOWED_HOSTS`, `HABBLAUD_DEMO`, `HABBLAUD_TERMINAL`,
-`HABBLAUD_MENSAGENS`, `HABBLAUD_CODEX`, `HABBLAUD_UPDATE_CHECK`, `HABBLAUD_LANG`, `HABBLAUD_PTY`, las `HABBLAUD_WORLD*` y las
-`HABBLAUD_REMOTE_*` (en el `.env` o en el entorno) y `HABBLAUD_CLAUDE_DIRS`, `HABBLAUD_CODEX_DIRS`, `HABBLAUD_USAGE_DIR` y
+`HABBLAUD_MENSAGENS`, `HABBLAUD_CODEX`, `HABBLAUD_UPDATE_CHECK`, `HABBLAUD_LANG`, `HABBLAUD_PTY`, las `HABBLAUD_WORLD*`, las
+`HABBLAUD_REMOTE_*` y `HABBLAUD_PRIVATE_DIRS` (en el `.env` o en el entorno) y `HABBLAUD_CLAUDE_DIRS`, `HABBLAUD_CODEX_DIRS`, `HABBLAUD_USAGE_DIR` y
 `HABBLAUD_ACCOUNTS` (leídas por `docker:up` en el host); las demás quedan fijas dentro del contenedor. Opciones: `npm run docker:up -- --no-build` (inicia sin reconstruir),
 `npm run docker:down` (detiene) y `npm run docker:logs` (sigue los logs).
 

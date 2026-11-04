@@ -24,16 +24,17 @@ import type { FileFetcher } from '../deliveries/fetcher';
 import { HOST_WAIT_MS } from '../host-wait';
 
 export interface ApiDeps {
-  office: Office;
-  hub: Hub;
-  accounts: AccountsService;
+  // Só o que as rotas usam: a visão de quem não vê tudo (http/privacy.ts) entrega estes mesmos métodos, filtrados.
+  office: Pick<Office, 'isDemo' | 'setDemo' | 'resetCharacter' | 'setCharacter' | 'has' | 'detail'>;
+  hub: Pick<Hub, 'attach' | 'current'>;
+  accounts: Pick<AccountsService, 'allEntries' | 'entriesOf' | 'usageView'>;
   sources: () => SourceInfo[];
   version: string;
   inDocker: boolean;
   /** Terminal ligado (ServerConfig.terminal: só com bind local). */
   terminal?: boolean;
   /** Streams do terminal; sem eles o recurso fica desligado mesmo com `terminal`. */
-  terminals?: TerminalStreams;
+  terminals?: Pick<TerminalStreams, 'attach' | 'attachSession'>;
   /**
    * Histórico de sessões do terminal (GET /api/sessions/*, http/sessions.ts): o HistorySet de todas as ferramentas
    * (ou um provedor sozinho); mesma trava do terminal.
@@ -72,9 +73,9 @@ export interface ApiDeps {
   /** Ditado (/api/dictation e, para o auxiliar do host, /api/host/dictation/*; dictation/dictation.ts). */
   dictation?: DictationService;
   /** Entregas (GET /api/deliveries e os anexos em /api/deliveries/file/:id; deliveries/deliveries.ts). */
-  deliveries?: DeliveryIndex;
+  deliveries?: Pick<DeliveryIndex, 'list' | 'attachment'>;
   /** Quem lê os arquivos das entregas (e, para o auxiliar do host, /api/host/files/*; deliveries/fetcher.ts). */
-  files?: FileFetcher;
+  files?: Pick<FileFetcher, 'get' | 'pollWait' | 'ack'>;
   /** Renomeia a sala (POST /api/rooms/rename {id, name}; vazio volta ao padrão). Devolve o nome em uso, ou undefined se a sala não existe. */
   renameRoom?: (id: string, name: string) => string | undefined;
   /** Estatísticas do "Meu dia" (GET /api/stats, http/stats.ts). */

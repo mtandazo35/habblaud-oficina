@@ -32,7 +32,7 @@ export function waitMs(url: URL): number {
   return Math.min(WAIT_MAX_MS, Math.max(50, raw * 1_000));
 }
 
-export function createPermissionRoutes(registry: PermissionRegistry): (req: IncomingMessage, res: ServerResponse, path: string) => void {
+export function createPermissionRoutes(registry: Pick<PermissionRegistry, 'register' | 'wait' | 'decide' | 'detail'>): (req: IncomingMessage, res: ServerResponse, path: string) => void {
   const register = async (req: IncomingMessage, res: ServerResponse) => {
     const body = await readJson(req);
     const r = registry.register(body);

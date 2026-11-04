@@ -5,6 +5,13 @@ export const ES: Readonly<Record<string, string>> = {
   // client/src/main.ts
   "Escritório virtual em pixel art que mostra, em tempo real, o que seus agentes do Claude Code estão fazendo.": "Oficina virtual en pixel art que muestra, en tiempo real, lo que están haciendo tus agentes de Claude Code.",
 
+  // server/http/privacy.ts
+  "HABBLAUD_PRIVATE_DIRS: \"{0}\" não tem um usuário válido (use <pasta>=<usuário>): ninguém vê essa pasta pela porta remota.": "HABBLAUD_PRIVATE_DIRS: \"{0}\" no tiene un usuario válido (usa <carpeta>=<usuario>): nadie ve esa carpeta por el puerto remoto.",
+  "HABBLAUD_PRIVATE_DIRS: a pasta {0} aparece com dois donos: ninguém a vê pela porta remota.": "HABBLAUD_PRIVATE_DIRS: la carpeta {0} aparece con dos dueños: nadie la ve por el puerto remoto.",
+  "HABBLAUD_PRIVATE_DIRS: entrada sem pasta ignorada: \"{0}\".": "HABBLAUD_PRIVATE_DIRS: entrada sin carpeta ignorada: \"{0}\".",
+  "   Sessões privadas: a pasta {0} não é de nenhuma conta: confira o caminho, porque nada está sendo escondido por ela.": "   Sesiones privadas: la carpeta {0} no es de ninguna cuenta: revisa la ruta, porque no se está ocultando nada por ella.",
+  "   Sessões privadas: {0} pasta(s) reservada(s) na porta remota.": "   Sesiones privadas: {0} carpeta(s) reservada(s) en el puerto remoto.",
+
   // client/src/net/store.ts
   "Este pedido já foi respondido.": "Esta solicitud ya fue respondida.",
   "Não foi possível responder (erro {0}).": "No se pudo responder (error {0}).",

@@ -7,7 +7,8 @@ import { join } from 'node:path';
 import { codexDirsRefused, isDefaultDir } from './accounts/detect';
 import { AccountsService } from './accounts/service';
 import { isTruthy, loadConfig, messagesOffReason, terminalOffReason, worldSocketUrl } from './config';
-import { createApiHandler, sendJson } from './http/app';
+import { createApiHandler, sendJson, type ApiDeps } from './http/app';
+import { createPrivacy } from './http/privacy';
 import { createRequestGuard, isLoopbackHost } from './http/guard';
 import { createRemoteGate, isRemoteRequest, loadSecret, LoginThrottles, RemoteSessions, remoteRequestUser, startRemoteListener, type RemoteFeature, type RemoteListener } from './http/remote';
 import type { IncomingMessage } from 'node:http';
@@ -28,7 +29,7 @@ import { createPtyRoutes } from './http/pty';
 import { claudeBinFrom, isExecutableFile, loadPty, PtyManager, type ScreenFactory, type SpawnPty } from './pty/manager';
 import { loadHeadlessScreen } from './pty/screen';
 import { openMainAgent, SessionHistory } from './sources/history';
-import { HistorySet, SourceSet } from './sources/source';
+import { HistorySet, SourceSet, type SessionLookup } from './sources/source';
 import { createPermissionRoutes } from './permissions/http';
 import { PermissionRegistry } from './permissions/registry';
 import { codexAccountOf } from './codex/http';
@@ -207,20 +208,20 @@ const history = config.terminal
 if (history && codex) history.add(new CodexHistory({ accounts: () => accounts.entriesOf('codex'), openAgentOf: (acc, sid) => openMainAgent(office.list(), acc, sid) }));
 // Entregas: o fim de cada pedido, lido dos transcripts do histórico (mesma trava do terminal). Os arquivos entregues
 // são lidos aqui (Node, ou pasta de conta montada no Docker) ou pelo auxiliar do host.
-const deliveries = history
-  ? new DeliveryIndex({
-      sessions: () => history.list(),
-      resolve: (account, sessionId) => {
-        const r = history.resolve(account, sessionId);
-        return 'path' in r ? r : undefined;
-      },
-      isBusy: (id) => {
-        const st = office.list().find((a) => a.id === id)?.status;
-        return st === 'working' || st === 'waiting' || st === 'shell';
-      },
-      agentName: (id) => office.list().find((a) => a.id === id)?.name,
-    })
-  : undefined;
+const deliveriesOf = (lookup: SessionLookup) =>
+  new DeliveryIndex({
+    sessions: () => lookup.list(),
+    resolve: (account, sessionId) => {
+      const r = lookup.resolve(account, sessionId);
+      return 'path' in r ? r : undefined;
+    },
+    isBusy: (id) => {
+      const st = office.list().find((a) => a.id === id)?.status;
+      return st === 'working' || st === 'waiting' || st === 'shell';
+    },
+    agentName: (id) => office.list().find((a) => a.id === id)?.name,
+  });
+const deliveries = history ? deliveriesOf(history) : undefined;
 const deliveryFiles = deliveries
   ? new FileFetcher({
       direct: !config.inDocker,
@@ -347,7 +348,14 @@ const ticker = setInterval(() => {
   }
 }, 250);
 
-const api = createApiHandler({
+const spawnFoldersOf = (view: Pick<Hub, 'current'>, lookup: SessionLookup | undefined) => async () => {
+  const snap = view.current();
+  const last = new Map<string, number>();
+  for (const a of snap.agents) last.set(a.roomId, Math.max(last.get(a.roomId) ?? 0, a.lastEventAt ?? 0));
+  const rooms = snap.rooms.filter((r) => !isDemoId(r.id)).map((r) => ({ path: r.path, lastAt: last.get(r.id) ?? 0 }));
+  return recentFolders(lookup ? await lookup.list().catch(() => []) : [], rooms);
+};
+const apiDeps: ApiDeps = {
   renameRoom: (id, name) => {
     const path = office.roomPath(id);
     if (!path) return undefined;
@@ -373,19 +381,34 @@ const api = createApiHandler({
   dictation,
   deliveries,
   files: deliveryFiles,
-  spawnFolders: async () => {
-    const snap = hub.current();
-    const last = new Map<string, number>();
-    for (const a of snap.agents) last.set(a.roomId, Math.max(last.get(a.roomId) ?? 0, a.lastEventAt ?? 0));
-    const rooms = snap.rooms.filter((r) => !isDemoId(r.id)).map((r) => ({ path: r.path, lastAt: last.get(r.id) ?? 0 }));
-    return recentFolders(history ? await history.list().catch(() => []) : [], rooms);
-  },
+  spawnFolders: spawnFoldersOf(hub, history),
   codexLive,
   stats,
   updates,
   remote: config.remote ? { is: isRemoteRequest, allows: remoteCan } : undefined,
   world: world ? createWorldRoutes(world, worldViewer, worldSocial) : undefined,
-});
+};
+const api = createApiHandler(apiDeps);
+// Sessões privadas (http/privacy.ts): HABBLAUD_PRIVATE_DIRS, só na porta remota. Sem a variável, nada muda.
+const privacy = config.remote
+  ? createPrivacy({
+      raw: process.env.HABBLAUD_PRIVATE_DIRS,
+      home: config.home,
+      dataDir: config.dataDir,
+      timeline: !!timeline,
+      base: apiDeps,
+      api,
+      office,
+      hub,
+      accounts,
+      roomAlias: (path) => roomAliases.get(path),
+      permissions,
+      messages,
+      deliveriesOf,
+      spawnFoldersOf,
+    })
+  : undefined;
+privacy?.start();
 
 const server = http.createServer();
 let closeVite: (() => Promise<void>) | undefined;
@@ -466,7 +489,7 @@ if (config.remote) {
       try {
         if (guard(req, res)) return;
         if (gate(req, res, url)) return;
-        if (!api(req, res, url)) fallback(req, res, url);
+        if (!(privacy?.apiFor(remoteRequestUser(req)) ?? api)(req, res, url)) fallback(req, res, url);
       } catch (err) {
         log.warn(tr('Erro ao responder (remoto) {0} {1}: {2}', [req.method, url.pathname, errMsg(err)]));
         if (!res.headersSent) sendJson(res, 500, { error: tr('erro interno') });
@@ -564,6 +587,7 @@ function shutdown(signal: string): void {
   shuttingDown = true;
   log.info(tr('Encerrando ({0})…', [signal]));
   clearInterval(ticker);
+  privacy?.stop();
   stats.stop();
   agents.stop();
   accounts.stop();
